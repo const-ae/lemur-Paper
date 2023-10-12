@@ -2036,14 +2036,14 @@
     },
     "lemur": {
       "Package": "lemur",
-      "Version": "0.99.6",
+      "Version": "0.99.7",
       "Source": "GitHub",
       "RemoteType": "github",
       "RemoteHost": "api.github.com",
       "RemoteUsername": "const-ae",
       "RemoteRepo": "lemur",
-      "RemoteRef": "34dc90b774db316cf484b4df4b17049bd20de2c0",
-      "RemoteSha": "34dc90b774db316cf484b4df4b17049bd20de2c0",
+      "RemoteRef": "2f9164a1ca085ef0b84b52b1c5b5f0de1411e4d2",
+      "RemoteSha": "2f9164a1ca085ef0b84b52b1c5b5f0de1411e4d2",
       "Requirements": [
         "BiocGenerics",
         "BiocNeighbors",
@@ -2068,7 +2068,7 @@
         "utils",
         "vctrs"
       ],
-      "Hash": "1aad874fa3cd892fe73a4f807359569b"
+      "Hash": "423fda087ed1ed0b8df3fa5f94f361c6"
     },
     "lifecycle": {
       "Package": "lifecycle",
@@ -2560,6 +2560,19 @@
         "R"
       ],
       "Hash": "5e3c5dc0b071b21fa128676560dbe94d"
+    },
+    "rdist": {
+      "Package": "rdist",
+      "Version": "0.0.5",
+      "Source": "Repository",
+      "Repository": "CRAN",
+      "Requirements": [
+        "R",
+        "Rcpp",
+        "RcppArmadillo",
+        "methods"
+      ],
+      "Hash": "8692a8277fe5bfa100eabe3b03923ca5"
     },
     "readr": {
       "Package": "readr",
@@ -3335,6 +3348,23 @@
         "utils"
       ],
       "Hash": "ad59484418ab8b1aa891e71bb590ac13"
+    },
+    "transport": {
+      "Package": "transport",
+      "Version": "0.14-6",
+      "Source": "Repository",
+      "Repository": "CRAN",
+      "Requirements": [
+        "R",
+        "Rcpp",
+        "RcppEigen",
+        "data.table",
+        "grDevices",
+        "graphics",
+        "methods",
+        "stats"
+      ],
+      "Hash": "4971cd2350badbda56b09e1003800d75"
     },
     "tzdb": {
       "Package": "tzdb",

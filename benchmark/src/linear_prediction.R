@@ -53,8 +53,8 @@ for(lvl in config$contrast){
 # Save everything
 dir.create(out_dir)
 for(lvl in config$contrast){
-  write.table(predict_results[[lvl]], file = file.path(out_dir, glue::glue("train-prediction_{lvl}.tsv")), row.names = FALSE, col.names = FALSE)
-  write.table(predict_holdout_results[[lvl]], file = file.path(out_dir, glue::glue("holdout-prediction_{lvl}.tsv")), row.names = FALSE, col.names = FALSE)
+  write.table(predict_results[[lvl]], file = file.path(out_dir, glue::glue("train-prediction_{lvl}.tsv")), row.names = FALSE, col.names = FALSE, sep = "\t")
+  write.table(predict_holdout_results[[lvl]], file = file.path(out_dir, glue::glue("holdout-prediction_{lvl}.tsv")), row.names = FALSE, col.names = FALSE, sep = "\t")
 }
 
 #### Session Info
