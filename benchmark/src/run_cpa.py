@@ -13,6 +13,7 @@ from pathlib import Path
 import scanpy as sc
 import numpy as np
 import pandas as pd
+from pandas.api.types import is_numeric_dtype
 import cpa
 import session_info
 
@@ -45,10 +46,23 @@ out_dir = args.working_dir + "/results/" + args.result_id
 adata = sc.read_h5ad(args.working_dir + "/results/" +  args.data_id + "/train.h5ad")
 holdout_adata = sc.read_h5ad(args.working_dir + "/results/" +  args.data_id + "/holdout.h5ad")
 
-cpa.CPA.setup_anndata(adata, perturbation_key=config['main_covariate'],
-     control_group = config['contrast'][0], is_count_data = False)
-cpa.CPA.setup_anndata(holdout_adata, perturbation_key=config['main_covariate'],
-     control_group = config['contrast'][0], is_count_data = False)
+if is_numeric_dtype(adata.obs[config['main_covariate']]):
+  adata.obs['key'] = np.where(adata.obs[config['main_covariate']] == config['contrast'][0], "ctrl", "pert")
+  holdout_adata.obs['key'] = np.where(holdout_adata.obs[config['main_covariate']] == config['contrast'][0], "ctrl", "pert")
+  config['num_covariate'] = config['main_covariate']
+  config['main_covariate'] = 'key'
+  config['num_contrast'] = config['contrast']
+  config['contrast'] = ["ctrl", "pert"]
+
+  cpa.CPA.setup_anndata(adata, perturbation_key=config['main_covariate'],
+       control_group = config['contrast'][0], is_count_data = False, dosage_key = config['num_covariate'])
+  cpa.CPA.setup_anndata(holdout_adata, perturbation_key=config['main_covariate'],
+       control_group = config['contrast'][0], is_count_data = False, dosage_key = config['num_covariate'])
+else:
+  cpa.CPA.setup_anndata(adata, perturbation_key=config['main_covariate'],
+       control_group = config['contrast'][0], is_count_data = False)
+  cpa.CPA.setup_anndata(holdout_adata, perturbation_key=config['main_covariate'],
+       control_group = config['contrast'][0], is_count_data = False)
 
 
 model = cpa.CPA(adata, n_latent = args.n_latent, recon_loss = 'gauss')

@@ -131,6 +131,7 @@ outfile <- file.path(pa$working_dir, "results/", pa$result_id)
 # ---------------------------------------
 
 sce <- zellkonverter::readH5AD(file.path(pa$working_dir, "results", pa$data_id, "train.h5ad"))
+holdout <- zellkonverter::readH5AD(file.path(pa$working_dir, "results", pa$data_id, "holdout.h5ad"))
 
 train_file1 <- file.path(pa$working_dir, "results", pa$prediction_id, paste0("train-prediction_", config$contrast[1], ".tsv"))
 train_file2 <- file.path(pa$working_dir, "results", pa$prediction_id, paste0("train-prediction_", config$contrast[2], ".tsv"))
@@ -138,10 +139,11 @@ holdout_file1 <- file.path(pa$working_dir, "results", pa$prediction_id, paste0("
 holdout_file2 <- file.path(pa$working_dir, "results", pa$prediction_id, paste0("holdout-prediction_", config$contrast[2], ".tsv"))
 
 ref_is_gr1 <- colData(sce)[[config$main_covariate]] == config$contrast[1]
+ref_is_gr2 <- colData(sce)[[config$main_covariate]] == config$contrast[2]
 ref_obs <- as.matrix(assay(sce, config$assay_continuous))
 
 ref_obs1 <- ref_obs[,ref_is_gr1]
-ref_obs2 <- ref_obs[,!ref_is_gr1]
+ref_obs2 <- ref_obs[,ref_is_gr2]
 
 # Identity
 res_ident <- calculate_metrics(ref_obs1, ref_obs2)
@@ -158,6 +160,9 @@ res_opt2$comparison <- "obs2_vs_obs2"
 # Against training
 train_pred1 <- as.matrix(data.table::fread(train_file1, sep = "\t", header = FALSE, col.names = colnames(sce)))
 train_pred2 <- as.matrix(data.table::fread(train_file2, sep = "\t", header = FALSE, col.names = colnames(sce)))
+## Subset pred to cross-condition (i.e., cell is ctrl and cond is trt)
+train_pred1 <- train_pred1[,!ref_is_gr1]
+train_pred2 <- train_pred2[,!ref_is_gr2]
 res_train1 <- calculate_metrics(train_pred1, ref_obs1)
 res_train1$comparison <- "train1_vs_obs1"
 res_train2 <- calculate_metrics(train_pred2, ref_obs2)
@@ -167,6 +172,10 @@ res_train2$comparison <- "train2_vs_obs2"
 res <- if(all(file.exists(c(holdout_file1, holdout_file2)))){
   pred1 <- as.matrix(data.table::fread(holdout_file1, sep = "\t", header = FALSE))
   pred2 <- as.matrix(data.table::fread(holdout_file2, sep = "\t", header = FALSE))
+  is_gr1 <- colData(holdout)[[config$main_covariate]] == config$contrast[1]
+  is_gr2 <- colData(holdout)[[config$main_covariate]] == config$contrast[2]
+  pred1 <- pred1[,!is_gr1]
+  pred2 <- pred2[,!is_gr2]
   
   res_holdout1 <- calculate_metrics(pred1, ref_obs1)
   res_holdout1$comparison <- "holdout1_vs_obs1"

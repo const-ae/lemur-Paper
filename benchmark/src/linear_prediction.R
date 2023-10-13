@@ -29,22 +29,23 @@ mat <- as.matrix(assay(sce, config$assay_continuous))
 batch_covs <- paste0(vapply(config$batch_covariates, \(x) paste0(" + ", x), FUN.VALUE = character(1L)), collapse = "", recycle0 = TRUE)
 formula_string <-  paste0("t(mat) ~ ", config$main_covariate, " ", batch_covs)
 df <- colData(sce)
-df[[config$main_covariate]] <- as.factor(df[[config$main_covariate]])
 df_holdout <- colData(holdout)
-df_holdout[[config$main_covariate]] <- factor(df_holdout[[config$main_covariate]], 
-                                              levels = levels(df[[config$main_covariate]]))
+
+if(! is.numeric(df[[config$main_covariate]])){
+  df[[config$main_covariate]] <- as.factor(df[[config$main_covariate]])
+  df_holdout[[config$main_covariate]] <- factor(df_holdout[[config$main_covariate]], 
+                                                levels = levels(df[[config$main_covariate]]))
+}
   
 fit <- lm(as.formula(formula_string), data = df)
 
 predict_results <- replicate(length(config$contrast), NULL)
 predict_holdout_results <- replicate(length(config$contrast), NULL)
-names(predict_results) <- config$contrast
-names(predict_holdout_results) <- config$contrast
-for(lvl in config$contrast){
-  df[[config$main_covariate]] <- lvl
-  df_holdout[[config$main_covariate]] <- lvl
-  predict_results[[lvl]] <- t(predict(fit, df))
-  predict_holdout_results[[lvl]] <- t(predict(fit, df_holdout))
+for(idx in seq_along(config$contrast)){
+  df[[config$main_covariate]] <- config$contrast[idx]
+  df_holdout[[config$main_covariate]] <- config$contrast[idx]
+  predict_results[[idx]] <- t(predict(fit, df))
+  predict_holdout_results[[idx]] <- t(predict(fit, df_holdout))
 }
 
 
@@ -52,9 +53,9 @@ for(lvl in config$contrast){
 # qs::qsave(list(predictions = predict_results), output_file)
 # Save everything
 dir.create(out_dir)
-for(lvl in config$contrast){
-  write.table(predict_results[[lvl]], file = file.path(out_dir, glue::glue("train-prediction_{lvl}.tsv")), row.names = FALSE, col.names = FALSE, sep = "\t")
-  write.table(predict_holdout_results[[lvl]], file = file.path(out_dir, glue::glue("holdout-prediction_{lvl}.tsv")), row.names = FALSE, col.names = FALSE, sep = "\t")
+for(idx in seq_along(config$contrast)){
+  write.table(predict_results[[idx]], file = file.path(out_dir, glue::glue("train-prediction_{config$contrast[idx]}.tsv")), row.names = FALSE, col.names = FALSE, sep = "\t")
+  write.table(predict_holdout_results[[idx]], file = file.path(out_dir, glue::glue("holdout-prediction_{config$contrast[idx]}.tsv")), row.names = FALSE, col.names = FALSE, sep = "\t")
 }
 
 #### Session Info

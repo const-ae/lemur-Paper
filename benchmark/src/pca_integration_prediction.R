@@ -41,11 +41,9 @@ holdout_embedding <- as.matrix(t(pca$rotation) %*% (mat_holdout - row_means))
 
 predict_results <- replicate(length(config$contrast), NULL)
 predict_holdout_results <- replicate(length(config$contrast), NULL)
-names(predict_results) <- config$contrast
-names(predict_holdout_results) <- config$contrast
-for(lvl in config$contrast){
-  predict_results[[lvl]] <- as.matrix(pca$rotation %*% train_embedding + row_means)
-  predict_holdout_results[[lvl]] <- as.matrix(pca$rotation %*% holdout_embedding + row_means)
+for(idx in seq_along(config$contrast)){
+  predict_results[[idx]] <- as.matrix(pca$rotation %*% train_embedding + row_means)
+  predict_holdout_results[[idx]] <- as.matrix(pca$rotation %*% holdout_embedding + row_means)
 }
 
 # Save everything
@@ -55,9 +53,9 @@ dir.create(out_dir)
 write.table(train_embedding, file = file.path(out_dir, glue::glue("train-embedding.tsv")), row.names = FALSE, col.names = FALSE, sep = "\t")
 write.table(holdout_embedding, file = file.path(out_dir, glue::glue("holdout-embedding.tsv")), row.names = FALSE, col.names = FALSE, sep = "\t")
 
-for(lvl in config$contrast){
-  write.table(predict_results[[lvl]], file = file.path(out_dir, glue::glue("train-prediction_{lvl}.tsv")), row.names = FALSE, col.names = FALSE, sep = "\t")
-  write.table(predict_holdout_results[[lvl]], file = file.path(out_dir, glue::glue("holdout-prediction_{lvl}.tsv")), row.names = FALSE, col.names = FALSE, sep = "\t")
+for(idx in seq_along(config$contrast)){
+  write.table(predict_results[[idx]], file = file.path(out_dir, glue::glue("train-prediction_{config$contrast[idx]}.tsv")), row.names = FALSE, col.names = FALSE, sep = "\t")
+  write.table(predict_holdout_results[[idx]], file = file.path(out_dir, glue::glue("holdout-prediction_{config$contrast[idx]}.tsv")), row.names = FALSE, col.names = FALSE, sep = "\t")
 }
 
 

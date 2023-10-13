@@ -8,25 +8,25 @@ prepare_data <- function(params, duration = "01:00:00", memory = "40GB"){
 
 #------------------------------------------------------------------------------------------------------
 
-lemur_integration_prediction <- function(params, dep_job, duration = "01:00:00", memory = "40GB"){
+lemur_integration_prediction <- function(params, dep_job, duration = "03:00:00", memory = "40GB"){
   MyWorkflowManager::wrap_script("src/lemur_integration_prediction.R", params = params,
                                  dependencies = list(dep_job),
                                  duration = duration, memory = memory)
 }
 
-linear_prediction <- function(params, dep_job, duration = "01:00:00", memory = "40GB"){
+linear_prediction <- function(params, dep_job, duration = "03:00:00", memory = "40GB"){
   MyWorkflowManager::wrap_script("src/linear_prediction.R", params = params, 
                                  dependencies = list(dep_job),
                                  duration = duration, memory = memory)
 }
 
-harmony_integration <- function(params, dep_job, duration = "01:00:00", memory = "40GB"){
+harmony_integration <- function(params, dep_job, duration = "03:00:00", memory = "40GB"){
   MyWorkflowManager::wrap_script("src/harmony_integration.R", params = params, 
                                  dependencies = list(dep_job),
                                  duration = duration, memory = memory)
 }
 
-pca_integration_prediction <- function(params, dep_job, duration = "01:00:00", memory = "40GB"){
+pca_integration_prediction <- function(params, dep_job, duration = "03:00:00", memory = "40GB"){
   MyWorkflowManager::wrap_script("src/pca_integration_prediction.R", params = params, 
                                  dependencies = list(dep_job),
                                  duration = duration, memory = memory)
@@ -40,7 +40,7 @@ cpa_integration_prediction <- function(params, dep_job, duration = "10:00:00", m
 
 #------------------------------------------------------------------------------------------------------
 
-evaluate_integration <- function(params, dep_jobs, duration = "01:00:00", memory = "40GB"){
+evaluate_integration <- function(params, dep_jobs, duration = "03:00:00", memory = "40GB"){
   MyWorkflowManager::wrap_script("src/evaluate_integration.R", params = params, 
                                  dependencies = dep_jobs, duration = duration, memory = memory)
 }
