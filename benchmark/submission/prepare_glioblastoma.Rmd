@@ -1,0 +1,419 @@
+---
+title: "R Notebook"
+---
+
+
+```{r}
+library(tidyverse)
+library(SingleCellExperiment)
+```
+
+
+```{r}
+
+if(! file.exists("../data/glioblastoma/glioblastoma_sce.qs")){
+  library(tidyverse)
+  library(SingleCellExperiment)
+  library(Matrix)
+  set.seed(1)
+  
+  dir.create("../data/glioblastoma")
+  if(! file.exists("../data/glioblastoma/GSE148842_RAW.tar")){
+    # Download for max. 10 minutes
+    options(timeout=600)
+    download.file("https://www.ncbi.nlm.nih.gov/geo/download/?acc=GSE148842&format=file", "../data/glioblastoma/GSE148842_RAW.tar")
+    untar("../data/glioblastoma/GSE148842_RAW.tar", exdir = "../data/glioblastoma")
+  }
+  
+  file_df <- tibble(file = list.files(path = "../data/glioblastoma", full.names = TRUE, pattern= "^GSM"),
+                    id = str_match(file, ".+/GSM\\d{7}_(PW[0-9-]*)\\.cts\\.txt\\.gz")[,2])
+  
+  
+  # Other the following crashes
+  Sys.setenv("VROOM_CONNECTION_SIZE" = "500000")
+  
+  geo_metadata <- GEOquery::getGEO("GSE148842")
+  # Parse geo metadata
+  patient_annotation <- bind_rows(as_tibble(geo_metadata[[1]]),
+                                  as_tibble(geo_metadata[[2]])) %>%
+    unite("description", starts_with("characteristic"), sep = "\n") %>%
+    transmute(id = title, description, origin = source_name_ch1) %>%
+    separate(id, into = c("patient_id", "treatment_id"), remove = FALSE) %>%
+    mutate(age = as.numeric(str_match(description, "age: (\\d{1,3})\\s")[,2]),
+           gender = str_match(description, "gender: ([MF])\\s")[,2],
+           location = str_match(description, "location:\\s*([^\\n]+)\\s*\\n")[,2],
+           diagnosis = str_match(description, "diagnosis:\\s*([^\\n]+)\\s*\\n")[,2],
+           treatment = str_match(description, "treatment:\\s*([^\\n]+)\\s*$")[,2]) %>%
+    dplyr::select(-description) %>%
+    mutate(patient_id = ifelse(str_starts(id, "PW05"), str_sub(id, start = 1L, end = -4L), patient_id),
+           treatment_id = ifelse(str_starts(id, "PW05"), str_sub(id, start = -3L, end = -1L), treatment_id)) %>%
+    mutate(origin = ifelse(origin == "glioma surgical biopsy", "biopsy", "tissue_slice"),
+           recurrent_tumor = str_ends(diagnosis, "recurrent")) %>%
+    mutate(condition = case_when(
+      treatment == "vehicle (DMSO)" ~ "ctrl",
+      treatment == "2.5 uM etoposide" ~ "etoposide",
+      treatment == "0.2 uM panobinostat" ~ "panobinostat",
+      TRUE ~ "other",
+    ))
+  
+  # Select panobinostat and one random slice for each condition
+  set.seed(1)
+  tmp <- patient_annotation %>%
+    tidylog::inner_join(file_df) %>%
+    filter(condition != "other") %>%
+    filter(! recurrent_tumor) %>%
+    filter(origin == "tissue_slice")
+  
+  # Load SingleCellExperiment from file
+  sces <- map(tmp$file, \(fi){
+    id <- str_match(fi, ".+/GSM\\d{7}_(PW[0-9-]*)\\.cts\\.txt\\.gz")[2]
+    df <- data.table::fread(file = fi, showProgress = FALSE) 
+    rowdata <- df[,c("gid", "gene")]
+    counts <- df %>%
+      dplyr::select(- c(gid, gene)) %>%
+      as.matrix() %>%
+      as("dgCMatrix")
+    rownames(counts) <- rowdata$gid
+    rownames(rowdata) <- rowdata$gid
+    sce <- SingleCellExperiment(list(counts = counts), colData = data.frame(id = rep(id, ncol(counts))), rowData = as.data.frame(rowdata))
+    # Reduce to 800 cells per sample
+    # sce <- sce[,sample.int(ncol(sce), min(ncol(sce), 800))]
+    sce
+  }, .progress = TRUE)
+  
+  
+  sce <- do.call(cbind, sces)
+  colnames <- make.unique(colnames(sce))
+  colData(sce) <- colData(sce) %>%
+    as.data.frame() %>%
+    tidylog::left_join(tmp, by = "id") %>%
+    dplyr::select(- c(file, origin, recurrent_tumor)) %>%
+    DataFrame()
+  
+  sce$pat_cond <- paste0(sce$patient_id, "-", sce$condition)
+  table(colData(sce)$pat_cond)
+  
+  
+  logcounts(sce) <- transformGamPoi::shifted_log_transform(sce)
+  colnames(sce) <- colnames
+  
+  # Remove useless genes
+  sce <- sce[rowSums(counts(sce)) >= 5, ]
+  # Remove version number of ENSEMBL gene id's
+  rowData(sce)$gid <- stringr::str_remove(rowData(sce)$gid, "\\.\\d+")
+  rownames(sce) <- rowData(sce)$gid
+  
+  
+  ah <- AnnotationHub::AnnotationHub()
+  annotation <- ah[["AH60085"]] %>%
+    as_tibble() %>%
+    filter(type == "gene") %>%
+    group_by(gene_id) %>%
+    summarize(chromosome = unique(seqnames), gene_length = median(width), strand. = strand, source)
+  
+  table(rowData(sce)$gid %in% annotation$gene_id)
+  
+  rowData(sce) <- rowData(sce) %>%
+    as.data.frame() %>%
+    mutate(gene_id = str_remove(gid, "\\.\\d+")) %>%
+    left_join(annotation, by = c("gene_id")) 
+  
+  qs::qsave(sce, "../data/glioblastoma/glioblastoma_sce.qs")
+}else{
+  sce <- qs::qread("../data/glioblastoma/glioblastoma_sce.qs")
+}
+
+```
+
+
+Quality filter scran
+
+```{r}
+qc_df <- scuttle::perCellQCMetrics(sce, subsets = list(Mito = ! is.na(rowData(sce)$chromosome) & rowData(sce)$chromosome == "MT",
+                                              Y_chr = ! is.na(rowData(sce)$chromosome) & rowData(sce)$chromosome == "Y"))
+
+as_tibble(qc_df, rownames = "barcode") %>%
+  tidylog::left_join(as_tibble(colData(sce), rownames = "barcode"), by = "barcode") %>%
+  group_by(patient_id, gender) %>%
+  summarize(max(subsets_Y_chr_percent))
+
+summary(qc_df$sum)
+summary(qc_df$detected)
+summary(qc_df$subsets_Mito_percent)
+```
+
+```{r}
+qc_filters <- scuttle::perCellQCFilters(qc_df, sub.fields = c("subsets_Mito_percent"))
+rownames(qc_filters) <- rownames(qc_df)
+qc_filters %>%
+  as_tibble() %>%
+  group_by(across()) %>%
+  summarize(n = n())
+```
+
+
+```{r}
+sce <- sce[,!qc_filters$discard]
+# Filter out extreme cell sizes
+sce <- sce[,colSums(counts(sce)) > 800 & colSums(counts(sce)) < 12000]
+```
+
+
+
+```{r}
+sel_chromosomes <- as.character(1:5)
+special_chr <- c("7", "10")
+chr_counts <- t(lemur:::aggregate_matrix(t(counts(sce)), group_split = deframe(vctrs::vec_group_loc(rowData(sce)$chromosome))[unique(c(sel_chromosomes, special_chr))], rowSums2))
+middle <- exp(matrixStats::rowMedians(log(chr_counts), na.rm=TRUE, useNames = TRUE))
+
+ratio <- chr_counts / middle
+sf <- colMedians(ratio, rows = which(rownames(ratio) %in% sel_chromosomes))
+
+# chr_feature <- cbind(chr10 = ratio["10",]/sf, chr7 = ratio["7",]/sf)
+# chr_clusters <- ClusterR::GMM(chr_feature, gaussian_comps = 2)
+# label <- ratio["10",]/sf < 1.15 & ratio["7",]/sf > 0.85
+simple_label <- ifelse(ratio["10",] < ratio["7",], "tumor", "microenvironment")
+
+tibble(chr10 = ratio["10",]/sf, chr7 = ratio["7",]/sf) %>%
+  mutate(simple_label) %>%
+  ggplot(aes(x = chr10, y = chr7)) +
+    geom_point(aes(color = simple_label), size= 0.1, stroke = 0) +
+    scale_x_log10() + scale_y_log10() +
+    guides(color = guide_legend(override.aes = list(size = 1)))
+```
+
+
+
+```{r}
+means <- rowMeans(logcounts(sce)[which(rowData(sce)$chromosome == "7"),])
+top_genes <- order(-means)[1:100]
+ratio2 <- t(t(logcounts(sce)[which(rowData(sce)$chromosome == "7")[top_genes],]) / means[top_genes])
+hist(apply(ratio2, 2, mean, trim = 0.25), breaks = 100)
+```
+
+
+
+```{r}
+# hist(colSums(logcounts(sce)[which(rowData(sce)$chromosome == "7"),]), breaks = 100)
+# hist(colSums(logcounts(sce)[which(rowData(sce)$chromosome == "10"),]), breaks = 100)
+
+chr_feature <- cbind("chr10" = colSums(logcounts(sce)[which(rowData(sce)$chromosome == "10"),]), 
+                     "chr7" = colSums(logcounts(sce)[which(rowData(sce)$chromosome == "7"),]))
+chr_clusters <- kmeans(chr_feature, centers = 2)
+
+chr_clusters <- ClusterR::GMM(chr_feature, gaussian_comps = 2)
+stopifnot((chr_clusters$centroids[1,1] > chr_clusters$centroids[2,1]) != (chr_clusters$centroids[1,2] > chr_clusters$centroids[2,2]))
+cl_1_is_tumor <- chr_clusters$centroids[1,1] < chr_clusters$centroids[2,1]
+tumor_label <- case_when(
+  colSums2(counts(sce)) < 400 ~ "uncertain",
+  predict(chr_clusters, newdata = chr_feature) == 1 & cl_1_is_tumor ~ "tumor",
+  predict(chr_clusters, newdata = chr_feature) == 1 & ! cl_1_is_tumor ~ "microenvironment",
+  predict(chr_clusters, newdata = chr_feature) == 2 & cl_1_is_tumor ~ "microenvironment",
+  predict(chr_clusters, newdata = chr_feature) == 2 & ! cl_1_is_tumor ~ "tumor",
+)
+
+table(tumor_label, simple_label)
+
+# plot(chr_feature, col = as.factor(tumor_label), pch = 16, cex = 0.2, asp = 1)
+as_tibble(chr_feature) %>%
+  mutate(tumor_label) %>%
+  ggplot(aes(x = chr10, y = chr7)) +
+    geom_point(aes(color = tumor_label), size=  0.1, stroke = 0) +
+    guides(color = guide_legend(override.aes = list(size = 2)))
+
+```
+
+```{r}
+set.seed(1)
+hvg <- order(-rowVars(logcounts(sce)))
+```
+
+
+
+
+```{r}
+subset_pca <- lemur:::pca(logcounts(sce)[hvg[1:2000], ], n = 35)
+# harm <- harmony::RunHarmony(t(subset_pca$embedding), meta_data = colData(sce), vars_use = c("pat_cond", "treatment_id"), lambda = c(1,1))
+# qs::qsave(harm, "../tmp/glioblastoma_harmony_embedding_full.qs")
+harm <- qs::qread("../tmp/glioblastoma_harmony_embedding_full.qs")
+harm_umap <- uwot::umap(harm)
+```
+
+
+```{r}
+as_tibble(harm_umap) %>%
+  bind_cols(as_tibble(colData(sce))) %>%
+  mutate(tumor_label = ifelse(simple_label == tumor_label, tumor_label, "uncertain")) %>%
+  sample_frac() %>%
+  ggplot(aes(x = V1, y = V2)) +
+    geom_point(aes(color = tumor_label), size = 0.3)
+
+as_tibble(harm_umap) %>%
+  bind_cols(as_tibble(colData(sce))) %>%
+  mutate(tumor_label = ifelse(simple_label == tumor_label, tumor_label, "uncertain")) %>%
+  sample_frac() %>%
+  ggplot(aes(x = V1, y = V2)) +
+    geom_point(aes(color = condition), size = 0.3)
+
+
+tibble(tumor_label, chr7 = colSums(logcounts(sce)[which(rowData(sce)$chromosome == "7"),]), 
+       chr10 = colSums(logcounts(sce)[which(rowData(sce)$chromosome == "10"),])) %>%
+  pivot_longer(starts_with("chr"), names_to = "chromosome", values_to = "count") %>%
+  ggplot(aes(x = count)) +
+    geom_histogram(aes(fill = tumor_label), position = "identity", alpha = 0.8, bins = 60) +
+    facet_wrap(vars(chromosome), scales = "free") +
+    labs(title = "Chromosome 10 deletion and chromosome 7 duplication in tumor samples")
+```
+
+Assign micro-environment cells
+
+```{r, paged.print=FALSE}
+graph <- bluster::makeKNNGraph(harm, k = 15, BNPARAM = BiocNeighbors::AnnoyParam())
+# Warning: this step needs more than 20GB of memory
+# clustering <- igraph::cluster_walktrap(graph)
+clustering <- qs::qread("../tmp/glioblastoma_harmony_clustering.qs")
+clusters <- igraph::cut_at(clustering, 4)
+
+as_tibble(harm_umap) %>%
+  bind_cols(as_tibble(colData(sce))) %>%
+  mutate(tumor_label = tumor_label) %>%
+  mutate(cluster = as.factor(clusters)) %>%
+  sample_frac() %>%
+  ggplot(aes(x = V1, y = V2)) +
+    geom_point(aes(color = cluster), size = 0.3, show.legend=FALSE) +
+    # geom_point(data = . %>% dplyr::filter(tumor_label == "microenvironment"), aes(color = cluster), size = 0.3, 
+    #            show.legend = FALSE) +
+    # geom_point(data = . %>% dplyr::filter(tumor_label != "microenvironment"), color = "grey", size = 0.3) +
+    geom_label(data = . %>% summarize(V1 = mean(V1), V2 = mean(V2), .by = cluster), 
+               aes(label = cluster, color = cluster), show.legend=FALSE)
+```
+
+
+```{r, paged.print=FALSE}
+as_tibble(colData(sce)) %>%
+  mutate(tumor_label = tumor_label) %>%
+  mutate(cluster = as.factor(clusters)) %>%
+  ggplot(aes(x = cluster)) +
+    geom_bar(aes(fill = patient_id))
+
+as_tibble(colData(sce)) %>%
+  mutate(tumor_label = tumor_label) %>%
+  mutate(cluster = as.factor(clusters)) %>%
+  dplyr::count(cluster, tumor_label) %>%
+  mutate(frac = n / sum(n), .by = "cluster") %>%
+  ggplot(aes(x = cluster, y = frac)) +
+    geom_col(aes(fill = tumor_label))
+
+```
+
+
+```{r}
+out <- scran::pairwiseWilcox(logcounts(sce), groups = ifelse(clusters == "2", "tumor", "micro"), direction = "up", lfc = 1)
+top <- scran::getTopMarkers(out$statistics, out$pairs, pairwise = FALSE)
+deframe(as_tibble(rowData(sce)[c("gid", "gene")]))[top$tumor]
+deframe(as_tibble(rowData(sce)[c("gid", "gene")]))[top$micro]
+
+tumor_markers <- c("GAP43", "TUBA1A", "S100A6", "RPS19")
+```
+
+- Gap43 is associated with mitochondria transfer in glioblastomas ([Watson, 2023](https://www.nature.com/articles/s43018-023-00556-5))
+- S100A6 has been called a biomarker for glioblastomas. Is is upregulated in TCGA and GTEx ([Hong, 2023](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC10509776/))
+
+
+
+```{r, paged.print=FALSE}
+# sel_genes <- c("GAD1", "LHX6", "ADARB2", "LAMP5", "VIP", "PVALB", "SST", "SLC17A7", "CUX2", 
+#                "RORB", "THEMIS", "FEZF2", "CTGF", "AQP4", "PDGFRA", "OPALIN", "FYB")
+# sel_genes <- c("SYT1", "DLGAP1", "ANKS1B", "ANK3", "FGF12", "MYT1L", "RBFOX1", "NRXN1", "RIMS2", "CCSER1")
+sel_genes <- c("CD14", "AIF1", "TYROBP", "CD163", "PLP1", "MAG", "SOX10", "MBP", "TRAC",
+               "TRBC1", "TRBC2", "CD3D", tumor_markers) #, "ESM1", "VWF", "CLDN5", "ITM2A", "DCN", "PDGFRB", "COL3A1", "RGS5")
+stopifnot(all(sel_genes %in% rowData(sce)$gene))
+gene_ids <- deframe(as_tibble(rowData(sce)[c("gene", "gid")]))[sel_genes]
+expr_mat <- counts(sce)[gene_ids, ]
+as_tibble(as.matrix(t(expr_mat))) %>%
+  mutate(cluster = clusters) %>%
+  # dplyr::filter(cluster %in% c(1, 2)) %>%
+  pivot_longer(-cluster, names_to = "gene_id", values_to = "expr") %>%
+  left_join(enframe(gene_ids,  name = "gene_name",value = "gene_id"), by = "gene_id") %>%
+  summarize(mean_expr = mean(expr, trim = 0),
+            frac_expr = mean(expr != 0),
+            .by = c(cluster, gene_id, gene_name)) %>%
+  mutate(gene_name = fct_rev(factor(gene_name, levels = sel_genes))) %>%
+  # mutate(expr = expr / max(expr), .by = c("gene_name"))  %>%
+  ggplot(aes(x = as.factor(cluster), y = gene_name)) +
+    geom_point(aes(color = log2(mean_expr + 1), size = frac_expr)) +
+    colorspace::scale_color_continuous_sequential() +
+    NULL
+```
+
+
+```{r, paged.print=FALSE}
+as_tibble(harm_umap) %>%
+  bind_cols(as_tibble(colData(sce))) %>%
+  mutate(expr = as_tibble(t(as.matrix(logcounts(sce)[gene_ids,])))) %>%
+  unpack(expr, names_sep = "-") %>%
+  pivot_longer(starts_with("expr"), names_sep = "-", names_to = c(".value", "gene_id")) %>%
+  left_join(enframe(gene_ids,  name = "gene_name",value = "gene_id"), by = "gene_id") %>%
+  mutate(gene_name = fct_rev(factor(gene_name, levels = sel_genes))) %>%
+  mutate(expr = expr / max(expr), .by = c("gene_name"))  %>%
+  sample_frac() %>%
+  ggplot(aes(x = V1, y = V2)) +
+    geom_point(aes(color = expr), size = 0.1, stroke = 0) +
+    colorspace::scale_color_continuous_sequential() +
+    facet_wrap(vars(gene_name))
+```
+
+
+
+
+
+```{r}
+cell_type_label <- case_when(
+  clusters == 1 ~ "Myeloid",
+  clusters == 2 ~ "Tumor",
+  clusters == 3 ~ "Oligodendrocytes",
+  clusters == 4 ~ "T cell"
+)
+
+as_tibble(harm_umap) %>%
+  bind_cols(as_tibble(colData(sce))) %>%
+  mutate(label = cell_type_label) %>%
+  sample_frac() %>%
+  ggplot(aes(x = V1, y = V2)) +
+    geom_point(aes(color = label), size = 0.1) +
+    guides(color = guide_legend(override.aes = list(size = 1)))
+  
+```
+
+```{r}
+colData(sce) <- colData(sce) %>%
+  as_tibble() %>%
+  mutate(cell_type = cell_type_label, chr_ratio_label = tumor_label,
+         chr_10_ratio = ratio["10",], chr_7_ratio = ratio["7",]) %>%
+  DataFrame()
+
+reducedDim(sce, "PCA") <- t(subset_pca$embedding)
+reducedDim(sce, "UMAP") <- uwot::umap(t(subset_pca$embedding))
+reducedDim(sce, "harmony") <- harm
+reducedDim(sce, "harmony_umap") <- harm_umap
+
+
+
+
+```
+
+
+```{r}
+qs::qsave(sce, "../data/glioblastoma/glioblastoma_annotated_sce.qs")
+qs::qsave(sce[,sample.int(ncol(sce), size = 15000)], "../data/glioblastoma/glioblastoma_annotated_sce_small.qs")
+```
+
+
+```{r}
+sce <- qs::qread("../data/glioblastoma/glioblastoma_annotated_sce.qs")
+fit <- lemur::lemur(sce, design = ~ condition + patient_id, n_embedding = 30, test_fraction = 0.7)
+fit_al <- lemur::align_harmony(fit)
+fit_al2 <- lemur::align_harmony(fit)
+```
+
+
