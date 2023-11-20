@@ -113,6 +113,31 @@ mixing_score <- function(data, ref_data, is_gr1, ref_is_gr1, k = 20){
   }, FUN.VALUE = numeric(1L)))
 }
 
+structure_conservation <- function(large_data, embedding, is_gr1){
+  pca_ref_gr1 <- irlba::prcomp_irlba(t(large_data[, is_gr1]), n = 30)  
+  clustering_ref_gr1 <- bluster::clusterRows(pca_ref_gr1$x, bluster::KNNGraphParam())
+
+  clustering_emb <- bluster::clusterRows(t(embedding[,is_gr1]), bluster::KNNGraphParam(), 
+                                         full = TRUE)
+  clustering_emb_cut <- igraph::cut_at(clustering_emb$objects$communities, 
+                                       no = length(unique(clustering_ref_gr1)))
+  list(
+    ARI = aricode::ARI(clustering_ref_gr1, clustering_emb_cut),
+    AMI = aricode::AMI(clustering_ref_gr1, clustering_emb_cut),
+    NMI = aricode::NMI(clustering_ref_gr1, clustering_emb_cut)
+  )
+}
+
+
+signal_to_noise_ratio <- function(embedding, is_gr1, cell_types){
+  overall_ss <- sum(residuals(lm(t(embedding) ~ 1))^2)
+  celltype_ss <- sum(residuals(lm(t(embedding) ~ cell_types))^2)
+  gr1_plus_celltype_ss <- sum(residuals(lm(t(embedding) ~ cell_types + is_gr1))^2)
+  celltype_ss / overall_ss
+  (celltype_ss - gr1_plus_celltype_ss) / overall_ss
+  
+  list(celltypeSS_over_totalSS = celltype_ss / overall_ss, batchSS_over_totalSS = (celltype_ss - gr1_plus_celltype_ss) / overall_ss)
+}
 
 calculate_metrics <- function(data, ref_data, is_gr1, ref_is_gr1){
   purrr::flatten(list(
@@ -135,9 +160,9 @@ pa <- argparser::add_argument(pa, "--working_dir", type = "character", help = "T
 pa <- argparser::add_argument(pa, "--result_id", type = "character", help = "The result_id")
 pa <- argparser::parse_args(pa)
 # pa <- argparser::parse_args(pa, argv = r"(
-#                             --data_id 8f872edd6a7eb-827531ae33574
+#                             --data_id f1809110732c2-e5f290978d2e2
 #                             --dataset_config kang
-#                             --integration_id f9a25def3156d-4396bf470ade3
+#                             --integration_id 8e4417d74d625-1e9271d3f54d6
 #                             --working_dir /scratch/ahlmanne/lemur_benchmark
 # )" |> stringr::str_trim() |> stringr::str_split("\\s+"))
 
@@ -155,6 +180,7 @@ train_file <- file.path(pa$working_dir, "results", pa$integration_id, "train-emb
 holdout_file <- file.path(pa$working_dir, "results", pa$integration_id, "holdout-embedding.tsv")
 
 ref_is_gr1 <- colData(sce)[[config$main_covariate]] == config$contrast[1]
+ref_celltypes <- colData(sce)[[config$cell_type_column]]
 ref_embedding <- as.matrix(data.table::fread(train_file, sep = "\t", header = FALSE, col.names = colnames(sce)))
 
 # Bring all data to the same scale
@@ -164,6 +190,8 @@ scale_factor <- mean(sqrt(colSums(ref_embedding^2)))
 ref_embedding <- ref_embedding / scale_factor + rm
 
 res1 <- calculate_metrics(ref_embedding, ref_embedding, ref_is_gr1, ref_is_gr1)
+res1 <- c(res1, structure_conservation(assay(sce, config$assay_continuous), ref_embedding, ref_is_gr1))
+res1 <- c(res1, signal_to_noise_ratio(ref_embedding, ref_is_gr1, ref_celltypes))
 res1$comparison <- "train_vs_train"
 
 res <- if(file.exists(holdout_file)){
@@ -171,7 +199,11 @@ res <- if(file.exists(holdout_file)){
   embedding <- (embedding - rm) / scale_factor + rm
   
   is_gr1 <- colData(holdout)[[config$main_covariate]] == config$contrast[1]
+  celltypes <- colData(holdout)[[config$cell_type_column]]
   res2 <- calculate_metrics(embedding, ref_embedding, is_gr1, ref_is_gr1)  
+  res2 <- c(res2, structure_conservation(assay(holdout, config$assay_continuous), embedding, is_gr1))
+  res2 <- c(res2, signal_to_noise_ratio(embedding, is_gr1, celltypes))
+  
   res2$comparison <- "holdout_vs_train"  
   rbind(as.data.frame(res1), 
         as.data.frame(res2))
