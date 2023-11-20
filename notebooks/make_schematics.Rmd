@@ -1,0 +1,199 @@
+---
+title: "R Notebook"
+---
+
+
+```{r}
+library(tidyverse)
+```
+
+
+```{r}
+make_block <- function(n_rows, n_cols, palette = "viridis", df = 10, div = FALSE, random = TRUE, mat = NULL){
+  if(random){
+    mat <- matrix(rt(n_rows * n_cols, df = df), nrow = n_rows, ncol = n_cols)
+  }else{
+    if(is.null(mat)){
+      mat <- matrix(seq_len(n_rows), ncol = 1) %*% matrix(seq_len(n_cols), nrow = 1)
+    }
+  }
+  colnames(mat) <- paste0("Cell_", seq_len(ncol(mat)))
+  rownames(mat) <- paste0("Gene_", seq_len(nrow(mat)))
+  
+  as_tibble(mat, rownames = "Gene") %>%
+    pivot_longer(-Gene, names_to = "Cell") %>%
+    mutate(Cell = factor(Cell, levels = colnames(mat)),
+           Gene = factor(Gene, levels = rownames(mat))) %>%
+    ggplot(aes(x = Cell, y = Gene)) +
+      geom_tile(aes(fill = value), show.legend = FALSE) +
+      (if(div){
+        colorspace::scale_fill_continuous_diverging(palette = palette)      
+      }else{
+        colorspace::scale_fill_continuous_sequential(palette = palette)
+      }) +
+      theme_void() +
+      coord_fixed()
+}
+
+set.seed(1)
+make_block(16, 30, "Magenta")
+ggsave("../plots/schematic_elements/y.pdf", unit = "cm", width = 6, height = 5, dpi = 300)
+make_block(7, 30, "YlGn")
+ggsave("../plots/schematic_elements/z.pdf", unit = "cm", width = 6, height = 3, dpi = 300)
+make_block(16, 7, "Blues 3", random = FALSE)
+ggsave("../plots/schematic_elements/r.pdf", unit = "cm", width = 3, height = 5, dpi = 300)
+make_block(7, 7, "Oranges", random = FALSE)
+ggsave("../plots/schematic_elements/s.pdf", unit = "cm", width = 3, height = 3, dpi = 300)
+
+make_block(16, 1, "PinkYl", random = FALSE)
+ggsave("../plots/schematic_elements/gamma.pdf", unit = "cm", width = 1, height = 5, dpi = 300)
+
+
+set.seed(1)
+make_block(12, 8, "Blue-Red 3", div = TRUE, random = TRUE)
+ggsave("../plots/schematic_elements/delta.pdf", unit = "cm", width = 3, height = 5, dpi = 300)
+
+make_block(palette = "Grays", random = FALSE, mat = matrix(runif(12 * 8) < 0.3, nrow = 12, ncol = 8) * 1.0)
+ggsave("../plots/schematic_elements/neighborhoods.pdf", unit = "cm", width = 3, height = 5, dpi = 300)
+
+
+```
+
+
+```{r}
+colorspace::hcl_palettes(plot = TRUE)
+colorspace::hcl_palettes(plot = TRUE, type = "diverging")
+```
+
+
+```{r}
+contrast <- function(colour) {
+  # print("WIthing contrast")
+  out   <- rep("black", length(colour))
+  light <- farver::get_channel(colour, "l", space = "hcl")
+  out[light < 50] <- "white"
+  out
+}
+
+
+set.seed(1)
+df <- tibble(patient = sample(c("A", "B"), size = 30, replace = TRUE),
+       cond = sample(c("treated", "ctrl"), size = 30, replace = TRUE)) %>%
+  arrange(cond, patient)
+
+
+mm <- model.matrix(~ patient + cond, data = df)
+rownames(mm) <- paste0("Cell_", seq_len(nrow(mm)))
+
+as_tibble(mm, rownames = "Cell") %>%
+  pivot_longer(-Cell, names_to = "Cov") %>%
+  mutate(Cell = factor(Cell, levels = rownames(mm)),
+         Cov = factor(Cov, levels = rev(colnames(mm)))) %>%
+  ggplot(aes(x = Cell, y = Cov)) +
+    geom_tile(aes(fill = value), color = "grey", show.legend = FALSE) +
+    geom_text(aes(label = value, colour = after_scale(contrast(fill)))) +
+    colorspace::scale_fill_continuous_sequential(palette = "Grays", begin = 0.05, end = 0.9) +
+    theme_void() +
+    coord_fixed()
+```
+
+
+
+```{r}
+tibble(x = seq(-1, 1, l = 100)) %>%
+  ggplot(aes(x = x, y = 0)) +
+    geom_tile(aes(fill = x), show.legend = FALSE) +
+    scale_fill_gradient2() +
+    theme_void()
+ggsave("../output/schematic_elements/color_gradient.pdf", unit = "cm", width = 3, height = 0.5, dpi = 300)
+
+
+```
+
+
+```{r}
+cum_z_stat <- function(x){
+  out <- rep(NA_real_, length(x))
+  m <- x[1]
+  msq <- 0
+  out[1] <- NA
+  for(idx in seq_along(x)[-1]){
+    delta <- x[idx] - m
+    m <- m + delta / idx
+    delta2 <- x[idx] - m
+    msq <- (msq * (idx-1) + delta * delta2) / idx
+
+    out[idx] <- m / sqrt(msq * idx / (idx-1)) * sqrt(idx)
+  }
+  out
+}
+set.seed(2)
+tibble(scores = c(rnorm(8, mean = 1.2, sd = 0.1), rnorm(22, mean = 0, sd = 0.2)),
+       pos = c(rnorm(8, mean = 1.2, sd = 0.1), rnorm(22, mean = 0, sd = 0.2))) %>%
+  arrange(pos) %>%
+  mutate(forward = cum_z_stat(scores),
+         rev = rev(cum_z_stat(rev(scores)))) %>%
+  pivot_longer(c(forward, rev), names_to = "direction", values_to = "z_score") %>%
+  ggplot(aes(x = pos, y = z_score)) +
+    geom_line(aes(group = direction), show.legend = FALSE) +
+    geom_hline(yintercept = 0, color = "grey") +
+    theme_void()
+
+ggsave("../output/schematic_elements/cumulative_z_score.pdf", unit = "cm", width = 6, height = 2, dpi = 300)
+
+```
+
+
+
+
+```{r}
+source("plot_helper.R")
+source("util.R")
+```
+
+
+
+```{r}
+plot_assemble(annotate_text("(A) ", x = 1, y = 1.5, vjust = 1, fontsize = font_size, fontface = "bold"),
+              annotate_graphic("../illustrations/equation_schematicArtboard 1.pdf", x = 90,  y = 127, units = "mm"),
+              annotate_text("(B) Schematic representation of an embedding", x = 1, y = 45, vjust = 1, fontsize = font_size, fontface = "bold"),
+              annotate_graphic("../illustrations/2d_embedding_schematicArtboard 1.pdf", x = 90,  y = 80, units = "mm"),
+              annotate_text("(C) Finding the embedding space", x = 1,y = 97, vjust = 1, fontsize = font_size, fontface = "bold"),
+              annotate_text("(D) Fine-tuning the embedding ($Z\\rightarrow Z'$)", x = 63, y = 97, vjust = 1, fontsize = font_size, fontface = "bold"),
+              annotate_text("(E) Finding DE neighborhoods", x = 120,   y = 97, vjust = 1, fontsize = font_size, fontface = "bold"),
+              annotate_graphic("../illustrations/scaling_schematicArtboard 1.pdf", x = 90,  y = 25, units = "mm"),
+              width = 180, height = 150, units = "mm", show_grid_lines = FALSE, latex_support = TRUE,
+              filename = "../output/conceptual_figure.pdf")
+```
+
+
+# Make DE plots
+
+```{r, paged.print=FALSE}
+source("util.R")
+
+tibble(gene = rep(paste0("gene_", 1:5), each = 4),
+       sample = rep(LETTERS[1:4], times = 5),
+       values = c(4,7,2,0, 0,1,1,3,  6,2,4,2,  1,0,0,0,  0,2,0,1)) %>%
+  mutate(condition = ifelse(sample %in% c("A", "B"), "Ctrl", "Trt")) %>%
+  filter(gene <= "gene_3") %>%
+  ggplot(aes(x = condition, y = values)) +
+    geom_hline(yintercept = 0, linewidth = 0.3) +
+    geom_point(aes(color = condition), show.legend = FALSE, size = 0.5) +
+    ggsignif::geom_signif(comparison = list(c("Ctrl", "Trt")), map_signif_level = \(x) case_when(
+      x < 0.4 ~ "**",
+      x < 0.7 ~ "*",
+      TRUE ~ "",
+    ), tip_length = 0, textsize = font_size_tiny / .pt, size = 0.3, margin_top = 0.2, vjust = 0.3) +
+    facet_wrap(vars(gene), ncol = 1) +
+    scale_color_manual(values = c("Ctrl" = "#00983a", "Trt" = "#82368c")) +
+    scale_y_continuous(limits = c(0, 9), breaks = c(0, 3, 6), expand = expansion(0)) +
+    coord_cartesian(clip = FALSE) +
+    theme(axis.title = element_blank())
+
+
+cowplot::save_plot("../plots/schematic_elements/de_results.pdf", last_plot(), 
+                   base_width = 19, base_height = 40, units = "mm")
+    
+```
+
