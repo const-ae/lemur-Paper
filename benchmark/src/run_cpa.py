@@ -49,15 +49,11 @@ holdout_adata = sc.read_h5ad(args.working_dir + "/results/" +  args.data_id + "/
 if is_numeric_dtype(adata.obs[config['main_covariate']]):
   adata.obs['key'] = np.where(adata.obs[config['main_covariate']] == config['contrast'][0], "ctrl", "pert")
   holdout_adata.obs['key'] = np.where(holdout_adata.obs[config['main_covariate']] == config['contrast'][0], "ctrl", "pert")
-  config['num_covariate'] = config['main_covariate']
-  config['main_covariate'] = 'key'
-  config['num_contrast'] = config['contrast']
-  config['contrast'] = ["ctrl", "pert"]
 
-  cpa.CPA.setup_anndata(adata, perturbation_key=config['main_covariate'],
-       control_group = config['contrast'][0], is_count_data = False, dosage_key = config['num_covariate'])
-  cpa.CPA.setup_anndata(holdout_adata, perturbation_key=config['main_covariate'],
-       control_group = config['contrast'][0], is_count_data = False, dosage_key = config['num_covariate'])
+  cpa.CPA.setup_anndata(adata, perturbation_key='key',
+       control_group = config['contrast'][0], is_count_data = False, dosage_key = config['main_covariate'])
+  cpa.CPA.setup_anndata(holdout_adata, perturbation_key='key',
+       control_group = config['contrast'][0], is_count_data = False, dosage_key = config['main_covariate'])
 else:
   cpa.CPA.setup_anndata(adata, perturbation_key=config['main_covariate'],
        control_group = config['contrast'][0], is_count_data = False)
@@ -74,7 +70,7 @@ basal_predict = model.custom_predict(basal = True, add_batch = False, add_pert =
 
 
 # Make predictions
-conditions = adata.obs[config['main_covariate']].unique()
+conditions = config['contrast']
 trained_preds = []
 holdout_preds = []
 for cond in conditions:
