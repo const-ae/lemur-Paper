@@ -94,11 +94,18 @@ mean_sd_agreement <- function(data, ref_data){
   list(l2_mean = l2_dist(rm, em), l2_sd = l2_dist(rs, es), r2_mean = cor(rm, em), r2_sd = cor(rs, es))
 }
 
+mean_sd_agreement_per_celltype <- function(data, ref_data, cell_types, ref_cell_types){
+  res <- as.list(colMeans(do.call(rbind, lapply(as.character(unique(cell_types)), \(ct){
+    unlist(mean_sd_agreement(data[,cell_types == ct,drop=FALSE], ref_data[,ref_cell_types == ct,drop=FALSE]))
+  })), na.rm = TRUE))
+  names(res) <- paste0(names(res), "_per_celltype")
+  res
+}
 
-
-calculate_metrics <- function(data, ref_data){
+calculate_metrics <- function(data, ref_data, cell_types, ref_cell_types){
   purrr::flatten(list(
     mean_sd_agreement(data, ref_data),
+    mean_sd_agreement_per_celltype(data, ref_data, cell_types, ref_cell_types),
     mmd = mmd_distance_wrapper(data, ref_data),
     wasserstein = wasserstein_wrapper(data, ref_data)
   ))
@@ -117,9 +124,9 @@ pa <- argparser::add_argument(pa, "--working_dir", type = "character", help = "T
 pa <- argparser::add_argument(pa, "--result_id", type = "character", help = "The result_id")
 pa <- argparser::parse_args(pa)
 # pa <- argparser::parse_args(pa, argv = r"(
-#                             --data_id 8f872edd6a7eb-827531ae33574
+#                             --data_id f1809110732c2-e5f290978d2e2
 #                             --dataset_config kang
-#                             --prediction_id 8d9793261d10f-4396bf470ade3
+#                             --prediction_id 8e4417d74d625-1e9271d3f54d6
 #                             --working_dir /scratch/ahlmanne/lemur_benchmark
 # )" |> stringr::str_trim() |> stringr::str_split("\\s+"))
 
@@ -144,18 +151,8 @@ ref_obs <- as.matrix(assay(sce, config$assay_continuous))
 
 ref_obs1 <- ref_obs[,ref_is_gr1]
 ref_obs2 <- ref_obs[,ref_is_gr2]
+ref_celltypes <- colData(sce)[[config$cell_type_column]]
 
-# Identity
-res_ident <- calculate_metrics(ref_obs1, ref_obs2)
-res_ident$comparison <- "obs1_vs_obs2"
-
-# Optimal
-split_id1 <- sample(c(TRUE, FALSE), size  = ncol(ref_obs1), replace = TRUE)
-split_id2 <- sample(c(TRUE, FALSE), size  = ncol(ref_obs2), replace = TRUE)
-res_opt1 <- calculate_metrics(ref_obs1[,split_id1,drop=FALSE], ref_obs1[,!split_id1,drop=FALSE])
-res_opt1$comparison <- "obs1_vs_obs1"
-res_opt2 <- calculate_metrics(ref_obs2[,split_id2,drop=FALSE], ref_obs2[,!split_id2,drop=FALSE])
-res_opt2$comparison <- "obs2_vs_obs2"
 
 # Against training
 train_pred1 <- as.matrix(data.table::fread(train_file1, sep = "\t", header = FALSE, col.names = colnames(sce)))
@@ -163,9 +160,9 @@ train_pred2 <- as.matrix(data.table::fread(train_file2, sep = "\t", header = FAL
 ## Subset pred to cross-condition (i.e., cell is ctrl and cond is trt)
 train_pred1 <- train_pred1[,!ref_is_gr1]
 train_pred2 <- train_pred2[,!ref_is_gr2]
-res_train1 <- calculate_metrics(train_pred1, ref_obs1)
+res_train1 <- calculate_metrics(train_pred1, ref_obs1, ref_celltypes[!ref_is_gr1], ref_celltypes[ref_is_gr1])
 res_train1$comparison <- "train1_vs_obs1"
-res_train2 <- calculate_metrics(train_pred2, ref_obs2)
+res_train2 <- calculate_metrics(train_pred2, ref_obs2, ref_celltypes[!ref_is_gr2], ref_celltypes[ref_is_gr2])
 res_train2$comparison <- "train2_vs_obs2"
 
 
@@ -174,16 +171,17 @@ res <- if(all(file.exists(c(holdout_file1, holdout_file2)))){
   pred2 <- as.matrix(data.table::fread(holdout_file2, sep = "\t", header = FALSE))
   is_gr1 <- colData(holdout)[[config$main_covariate]] == config$contrast[1]
   is_gr2 <- colData(holdout)[[config$main_covariate]] == config$contrast[2]
+  celltypes <- colData(holdout)[[config$cell_type_column]]
   pred1 <- pred1[,!is_gr1]
   pred2 <- pred2[,!is_gr2]
   
-  res_holdout1 <- calculate_metrics(pred1, ref_obs1)
+  res_holdout1 <- calculate_metrics(pred1, ref_obs1, celltypes[!is_gr1], ref_celltypes[ref_is_gr1])
   res_holdout1$comparison <- "holdout1_vs_obs1"
-  res_holdout2 <- calculate_metrics(pred2, ref_obs2)
+  res_holdout2 <- calculate_metrics(pred2, ref_obs2, celltypes[!is_gr2], ref_celltypes[ref_is_gr2])
   res_holdout2$comparison <- "holdout2_vs_obs2"
-  list(res_ident, res_opt1, res_opt2, res_train1, res_train2, res_holdout1, res_holdout2)  
+  list(res_train1, res_train2, res_holdout1, res_holdout2)  
 }else{
-  list(res_ident, res_opt1, res_opt2, res_train1, res_train2)  
+  list(res_train1, res_train2)  
 }
 
 res %>%
