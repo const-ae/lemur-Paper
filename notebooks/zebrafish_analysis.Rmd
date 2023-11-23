@@ -1,0 +1,278 @@
+---
+title: "R Notebook"
+---
+
+```{r}
+library(tidyverse)
+library(glue)
+library(SingleCellExperiment)
+source("util.R")
+```
+
+```{r}
+neural_genes <- c("iqsec1b", "nrxn2a")
+neural_gene_ids <- c("ENSDARG00000016551", "ENSDARG00000061454")
+periderm_genes <- c("krt18a.1", "krt8","slc6a9")
+periderm_gene_ids <- c("ENSDARG00000058358", "ENSDARG00000018404", "ENSDARG00000018534")
+```
+
+
+```{r}
+if(FALSE){
+  library(monocle3)
+  meta <- read_csv("~/huber/data/saunders_zebrafish_data/published/GSE202639_reference_cell_metadata.csv.gz")
+  data <- readRDS("~/huber/data/saunders_zebrafish_data/published/GSE202639_reference_cds.RDS")
+  data
+  
+  hvg <- order(-rowVars(counts(data)))
+  sce_subset <- data[hvg[1:2000],]
+  sce_subset <- sce_subset[,sce_subset$gene_target %in% c("ctrl-inj", "ctrl-uninj")]
+  sce_subset <- sce_subset[,! is.na(sce_subset$timepoint)]
+  sce_subset <- sce_subset[, sce_subset$timepoint >= 18 & sce_subset$timepoint <= 48]
+  logcounts(sce_subset) <- transformGamPoi::shifted_log_transform(sce_subset)
+  
+  system.time({
+    fit_sp <- lemur::lemur(sce_subset, design = ~ splines::ns(timepoint, df = 5), n_emb = 80)
+  })
+  reducedDim(fit_sp, "initial_embedding") <- t(fit_sp$embedding)
+  system.time({
+    fit_sp <- lemur::align_harmony(fit_sp)
+  })
+  
+  system.time({
+    fit_sp <- lemur::test_de(fit_sp, cond(timepoint = 48) - cond(timepoint = 24))
+  })
+  system.time({
+    nei_sp <- lemur::find_de_neighborhoods(fit_sp, group_by = vars(embryo, timepoint), test_method = "edgeR")
+  })
+  
+  reducedDim(fit_sp, "umap_embedding", withDimnames = FALSE) <- uwot::umap(t(fit_sp$embedding))
+  reducedDim(fit_sp, "umap_initial_embedding", withDimnames = FALSE) <- uwot::umap(reducedDim(fit_sp, "initial_embedding"))
+  reducedDim(fit_sp, "umap_original", withDimnames = FALSE) <- scater::calculateUMAP(fit_sp)
+  
+  
+  qs::qsave(fit_sp, "tmp/saunders_zebrafish-fit_hvg2k_subset_spline.qs")
+  qs::qsave(nei_sp, "tmp/saunders_zebrafish-fit_hvg2k_subsets_spline_nei.qs")
+}
+```
+
+
+```{r}
+if(FALSE){
+  fit <- qs::qread("../tmp/saunders_zebrafish-fit_hvg2k_subset_spline.qs")
+  fit
+  
+  sel_genes <- c(neural_genes, periderm_genes)
+  fit_subset <- fit[fit$rowData$id[fit$rowData$gene_short_name %in% sel_genes],]
+  reducedDim(fit_subset, "PCA") <- NULL
+  reducedDim(fit_subset, "initial_embedding") <- NULL
+  reducedDim(fit_subset, "Aligned") <- NULL
+  colData(fit_subset)[,c("Size_Factor", "Oligo", "umap3d_1", "umap3d_2", "umap3d_3", "temp")] <- NULL
+  
+  qs::qsave(fit_subset, "../output/zebrafish/saunders_zebrafish-fit_5_genes.qs")
+  umap_model <- uwot::umap(t(fit$embedding), ret_model = TRUE)
+  # qs::qsave(umap_model, "../output/zebrafish/saunders_zebrafish-embedding_umap_model.qs")
+  # uwot::save_uwot(umap_model, "../output/zebrafish/saunders_zebrafish-embedding.uwot_model")
+  
+  emb <- fit_subset$embedding
+  
+  start_cell1 <- "F08_B03_P04-C07_LIG124"
+  end_cell1 <- "G11_G02_P04-G08_LIG122"
+  interpolation1 <- t(lemur:::mply_dbl(seq(0, 1, l = 100), \(f){
+    emb[,start_cell1] + f * (emb[,end_cell1] - emb[,start_cell1])
+  }, ncol = nrow(emb)))
+  
+  start_cell2 <- "H04_H03_P03-C11_LIG190"
+  end_cell2 <- "G04_H11_P03-E03_LIG290"
+  interpolation2 <- t(lemur:::mply_dbl(seq(0, 1, l = 100), \(f){
+    emb[,start_cell2] + f * (emb[,end_cell2] - emb[,start_cell2])
+  }, ncol = nrow(emb)))
+  
+  umap_inter1 <- uwot::umap_transform(t(interpolation1), umap_model)
+  umap_inter2 <- uwot::umap_transform(t(interpolation2), umap_model)
+  
+  qs::qsave(list(umap_all = umap_model$embedding, umap_inter1 = umap_inter1, umap_inter2 = umap_inter2),
+            "../output/zebrafish/saunders_zebrafish-umap_embeddings.qs")
+}
+
+```
+
+
+
+```{r}
+fit_subset <- qs::qread("../benchmark/output/zebrafish/saunders_zebrafish-fit_5_genes.qs")
+umaps <- qs::qread("../benchmark/output/zebrafish/saunders_zebrafish-umap_embeddings.qs")
+```
+
+
+Time course
+
+```{r}
+timepoint_brackets <- santoku::chop_evenly(fit_subset$colData$timepoint, intervals = 5)
+
+time_course_pl <- as_tibble(colData(fit_subset)) %>%
+  mutate(timepoint_brackets = timepoint_brackets) %>%
+  mutate(umap = umaps$umap_all) %>%
+  ggplot(aes(x = umap[,1], y = umap[,2])) +
+    ggrastr::rasterize(geom_point(data = tibble(umap = umaps$umap_all), size = 0.01, stroke = 0, color = "grey95"), dpi = 300) +
+    ggrastr::rasterize(geom_point(size = 0.01, stroke = 0, color = "black"), dpi = 600) +
+    facet_wrap(vars(timepoint_brackets), nrow = 1) +
+    small_axis()
+  
+time_course_pl
+```
+
+
+```{r}
+n_pos <- 10
+sel_pos <- seq(1, nrow(umaps$umap_inter1), l = n_pos)
+
+umap_pl <- as_tibble(colData(fit_subset)) %>%
+  mutate(umap = umaps$umap_all) %>%
+  ggplot(aes(x = umap[,1], y = umap[,2])) +
+    ggrastr::rasterize(geom_point(size = 0.01, stroke = 0), dpi = 600) +
+    geom_point(data = tibble(umap = umaps$umap_inter1[sel_pos,], position = seq(0, 1, l = n_pos)), aes(color = position), size = 0.6) +
+    colorspace::scale_color_continuous_divergingx(palette = "Zissou1", mid = 0.5) +
+    ggnewscale::new_scale_color() +
+    geom_point(data = tibble(umap = umaps$umap_inter2[sel_pos,], position = seq(0, 1, l = n_pos)), aes(color = position), size = 0.6) +
+    colorspace::scale_color_continuous_divergingx(palette = "Tropic", mid = 0.5) +
+    small_axis(label = "UMAP")
+umap_pl
+```
+
+
+
+```{r}
+obs_gene_expr <- bind_rows(map(levels(timepoint_brackets), \(brack){
+  fit_br <- fit_subset[,timepoint_brackets == brack]
+  knn_index <- BiocNeighbors::buildAnnoy(t(fit_br$embedding))
+  close_to_interpol <- BiocNeighbors::queryAnnoy(precomputed = knn_index, query = t(interpolation1), k = 50, get.index = TRUE, get.distance = FALSE)$index
+  bind_rows(
+    as_tibble(t(as.matrix(logcounts(fit_br)[neural_gene_ids, close_to_interpol[1,]]))) %>% mutate(origin = 0),
+    as_tibble(t(as.matrix(logcounts(fit_br)[neural_gene_ids, close_to_interpol[round(ncol(interpolation1) * 0.25),]]))) %>% mutate(origin = 0.25),
+    as_tibble(t(as.matrix(logcounts(fit_br)[neural_gene_ids, close_to_interpol[round(ncol(interpolation1) * 0.5),]]))) %>% mutate(origin = 0.5),
+    as_tibble(t(as.matrix(logcounts(fit_br)[neural_gene_ids, close_to_interpol[round(ncol(interpolation1) * 0.75),]]))) %>% mutate(origin = 0.75),
+    as_tibble(t(as.matrix(logcounts(fit_br)[neural_gene_ids, close_to_interpol[round(ncol(interpolation1)),]]))) %>% mutate(origin = 1),
+  ) %>%
+    mutate(timepoint_br = brack)
+}))
+
+pred_expr_df <- tibble(timepoint = c(seq(18, 48, length = 50))) %>%
+  mutate(pred = map(timepoint, \(ti) as_tibble(predict(fit_subset, embedding = interpolation1, newcondition = cond(timepoint = ti))))) %>%
+  mutate(gene_id = list(rownames(fit_subset))) %>%
+  unnest(c(gene_id, starts_with("pred")), names_sep = "-") %>%
+  pivot_longer(starts_with("pred"), names_sep = "-", names_to = c(".value", "origin")) %>%
+  mutate(origin = as.integer(str_remove(origin, "V"))) %>%
+  mutate(origin = origin / max(origin)) %>%
+  left_join(as_tibble(rowData(fit_subset)), by = c("gene_id" = "id")) %>%
+  filter(gene_short_name %in% neural_genes)
+
+obs_expr_df <- obs_gene_expr %>%
+  pivot_longer(starts_with("ENSDAR"), names_to = "gene_id", values_to = "expr") %>%
+  mutate(timepoint_br = factor(timepoint_br, levels = levels(timepoint_brackets))) %>%
+  left_join(as_tibble(rowData(fit_subset)), by = c("gene_id" = "id")) %>% 
+  mutate(timepoint = str_extract_all(timepoint_br, "\\d+\\.?\\d*") %>% map_dbl(\(x) mean(as.numeric(x)))) 
+
+pred_plot <- pred_expr_df %>%
+  ggplot(aes(x = timepoint, y = pred)) +
+    geom_line(aes(color = origin, group = as.factor(origin))) +
+    stat_summary(data = obs_expr_df, geom = "point", aes(y = expr, fill = origin, group = interaction(timepoint_br, origin)), 
+                 fun.data = mean_se, shape = 21, color = "black", size = 2) +
+    geom_text(data = tibble(label = "Average of cells near the green\nposition for timepoints 18h-24h.", gene_short_name = "iqsec1b"),
+              aes(label = label), x = 18, y = 2.5, hjust = 0, vjust = 0.5, size = font_size_tiny / .pt) +
+    geom_segment(data = tibble(x = 24, y = 2.0, xend = 21, yend = 0.9, gene_short_name = "iqsec1b"),
+                 aes(x = x, y = y, xend = xend, yend = yend)) +
+    geom_text(data = tibble(label = "LEMUR's prediction for\nthe green position at 35h", gene_short_name = "iqsec1b"),
+              aes(label = label), x = 36.5, y = 2, hjust = 0, vjust = 0.5, size = font_size_tiny / .pt) +
+    geom_segment(data = tibble(x = 36, y = 1.5, xend = 35, yend = 1.02, gene_short_name = "iqsec1b"),
+                 aes(x = x, y = y, xend = xend, yend = yend)) +
+    facet_wrap(vars(gene_short_name), scales = "fixed") +
+    scale_y_continuous(expand = expansion(mult = c(0, 0.1)), limits = c(0, 3)) +
+    scale_x_continuous(breaks = c(18, 24, 30, 36, 42, 48)) +
+    # coord_cartesian(clip = "off") +
+    colorspace::scale_fill_continuous_divergingx(palette = "Zissou1", mid = 0.5) +
+    colorspace::scale_color_continuous_divergingx(palette = "Zissou1", mid = 0.5) +
+    guides(fill = "none") +
+    labs(y = "Expression", x = "Hours post fertilization")
+
+pred_plot
+```
+
+
+
+```{r, paged.print=FALSE}
+
+obs_gene_expr2 <- bind_rows(map(levels(timepoint_brackets), \(brack){
+  fit_br <- fit_subset[,timepoint_brackets == brack]
+  knn_index <- BiocNeighbors::buildAnnoy(t(fit_br$embedding))
+  close_to_interpol <- BiocNeighbors::queryAnnoy(precomputed = knn_index, query = t(interpolation2), k = 50, get.index = TRUE, get.distance = FALSE)$index
+  bind_rows(
+    as_tibble(t(as.matrix(logcounts(fit_br)[periderm_gene_ids, close_to_interpol[1,]]))) %>% mutate(origin = 0),
+    as_tibble(t(as.matrix(logcounts(fit_br)[periderm_gene_ids, close_to_interpol[round(ncol(interpolation2) * 0.25),]]))) %>% mutate(origin = 0.25),
+    as_tibble(t(as.matrix(logcounts(fit_br)[periderm_gene_ids, close_to_interpol[round(ncol(interpolation2) * 0.5),]]))) %>% mutate(origin = 0.5),
+    as_tibble(t(as.matrix(logcounts(fit_br)[periderm_gene_ids, close_to_interpol[round(ncol(interpolation2) * 0.75),]]))) %>% mutate(origin = 0.75),
+    as_tibble(t(as.matrix(logcounts(fit_br)[periderm_gene_ids, close_to_interpol[round(ncol(interpolation2)),]]))) %>% mutate(origin = 1),
+  ) %>%
+    mutate(timepoint_br = brack)
+}))
+
+pred_expr_df2 <- tibble(timepoint = c(seq(18, 48, length = 50))) %>%
+  mutate(pred = map(timepoint, \(ti) as_tibble(predict(fit_subset, embedding = interpolation2, newcondition = cond(timepoint = ti))))) %>%
+  mutate(gene_id = list(rownames(fit_subset))) %>%
+  unnest(c(gene_id, starts_with("pred")), names_sep = "-") %>%
+  pivot_longer(starts_with("pred"), names_sep = "-", names_to = c(".value", "origin")) %>%
+  mutate(origin = as.integer(str_remove(origin, "V"))) %>%
+  mutate(origin = origin / max(origin)) %>%
+  left_join(as_tibble(rowData(fit_subset)), by = c("gene_id" = "id")) %>%
+  filter(gene_short_name %in% periderm_genes)
+
+obs_expr_df2 <- obs_gene_expr2 %>%
+  pivot_longer(starts_with("ENSDAR"), names_to = "gene_id", values_to = "expr") %>%
+  mutate(timepoint_br = factor(timepoint_br, levels = levels(timepoint_brackets))) %>%
+  left_join(as_tibble(rowData(fit_subset)), by = c("gene_id" = "id")) %>% 
+  mutate(timepoint = str_extract_all(timepoint_br, "\\d+\\.?\\d*") %>% map_dbl(\(x) mean(as.numeric(x)))) %>%
+  filter(gene_short_name %in% periderm_genes[c(2,3)]) 
+
+pred_plot2 <- pred_expr_df2 %>%
+  filter(gene_short_name %in% periderm_genes[c(2,3)]) %>%
+  ggplot(aes(x = timepoint, y = pred)) +
+    geom_line(aes(color = origin, group = as.factor(origin))) +
+    stat_summary(data = obs_expr_df2, geom = "point", aes(y = expr, fill = origin, group = interaction(timepoint_br, origin)), 
+                 fun.data = mean_se, shape = 21, color = "black", size = 2) +
+    facet_wrap(vars(gene_short_name), scales = "fixed") +
+    scale_x_continuous(breaks = c(18, 24, 30, 36, 42, 48)) +
+    scale_y_continuous(expand = expansion(mult = c(0, 0.1)), limits = c(0, 3)) +
+    colorspace::scale_fill_continuous_divergingx(palette = "Tropic", mid = 0.5) +
+    colorspace::scale_color_continuous_divergingx(palette = "Tropic", mid = 0.5) +
+    guides(fill = "none") +
+    labs(y = "Expression", x = "Hours post fertilization")
+
+pred_plot2
+```
+
+
+
+```{r}
+plot_assemble(
+  add_text("(A) Zebrafish embryo time course (hours post fertilization)", x = 2.7, y = 1, fontsize = font_size, vjust = 1, fontface = "bold"),
+  add_plot(time_course_pl, x = 0, y = 3, width = 170, height = 50),
+  add_text("(B) Selected positions", x = 2.7, y = 53, fontsize = font_size, vjust = 1, fontface = "bold"),
+  add_plot(umap_pl + theme(legend.position = "none"), x = 0, y = 56, width = 60, height = 57),
+  add_text("(C) Predicted interactions between time and continuously varying positions",
+           x = 62.7, y = 53, fontsize = font_size, vjust = 1, fontface = "bold"),
+  add_plot(pred_plot + theme(legend.position = "none"), x = 60, y = 58, width = 110, height = 28.5),
+  add_plot(pred_plot2  + theme(legend.position = "none"), x = 60, y = 58+28.5, width = 110, height = 28.5),
+
+  width = 170, height = 116, units = "mm", show_grid_lines = FALSE,
+  latex_support = TRUE, filename = "../plots/continuous_covar_figure.pdf"
+)
+
+```
+
+
+```{r}
+table(fit_subset$colData$timepoint) |> length()
+table(fit_subset$colData$embryo) |> length()
+ncol(fit_subset)
+```
+
