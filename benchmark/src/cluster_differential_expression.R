@@ -65,6 +65,8 @@ de_res <- purrr::list_rbind(lapply(unique(group_var), \(lvl){
   tibble::remove_rownames(de)
 }))
 
+de_res$adj_pval <- p.adjust(de_res$pval, method = "BH")
+
 # Save everything
 dir.create(out_dir)
 saveRDS(de_res, file.path(out_dir, "de_results.RDS"))

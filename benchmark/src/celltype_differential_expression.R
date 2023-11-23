@@ -59,7 +59,9 @@ de_res <- purrr::list_rbind(lapply(unique(group_var), \(lvl){
   })
   de$cell_type <- lvl
   tibble::remove_rownames(de)
-}))
+})) 
+
+de_res$adj_pval <- p.adjust(de_res$pval, method = "BH")
 
 # Save everything
 dir.create(out_dir)
