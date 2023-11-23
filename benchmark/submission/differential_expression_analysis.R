@@ -45,7 +45,7 @@ res <- de_datasets %>%
   pivot_longer(starts_with("job"), names_sep = "-", names_to = c(".value", "method"))
 
 
-res %>% mutate(status = map_chr(job, job_status)) %>% print(n = 10)
+res %>% mutate(status = map_chr(job, job_status)) %>% print(n = 20)
 res %>% mutate(status = map_chr(job, job_status)) %>% filter(status != "done")
 # walk(res$job, run_job, priority = "normal")
 
@@ -71,60 +71,12 @@ power_res %>%
   dplyr::select(-strat_results) %>%
   write_tsv(glue::glue("output/differential_expression_fdr_power-{clustering}.tsv.gz"))
 
-power_res %>%
-  unnest(results) %>%
-  drop_na() %>%
-  separate(method,sep = "_", into = c("method", "de_method")) %>%
-  ggplot(aes(x = nominal_fdr, y = FDR)) +
-  geom_line(aes(color = method, group = paste0(method, vals))) +
-  geom_abline() +
-  facet_grid(vars(de_method), vars(data, vals)) +
-  coord_fixed()
-
-
-power_res %>%
-  unnest(results) %>%
-  separate(method,sep = "_", into = c("method", "de_method")) %>%
-  filter(de_method == "edgeR") %>%
-  filter(method == "lemur") %>%
-  ggplot(aes(x = nominal_fdr, y = FDR, group = paste0(method, vals))) +
-  # geom_line(data = . %>% filter(method != "lemur"), color = "lightgrey") +
-  geom_line(data = . %>% filter(method == "lemur"), color = "darkgrey", linewidth = 1) +
-  geom_line(data = . %>% filter(method == "lemur") %>% summarize(FDR = mean(FDR, na.rm = TRUE), .by = c(nominal_fdr)), 
-            aes(group = 1), color = "red", linewidth = 1) +
-  geom_abline() +
-  coord_fixed()
-
-
-power_res %>%
-  unnest(results) %>%
-  drop_na() %>%
-  separate(method,sep = "_", into = c("method", "de_method")) %>%
-  ggplot(aes(x = nominal_fdr, y = TPR)) +
-  geom_line(aes(color = method, group = paste0(method, vals))) +
-  facet_grid(vars(de_method), vars(data, vals)) 
-
-power_res %>%
-  unnest(strat_results) %>% 
-  # drop_na() %>%
-  separate(method,sep = "_", into = c("method", "de_method")) %>%
-  filter(de_method == "edgeR") %>%
-  # filter(abs(nominal_fdr - 0.1) < 0.001)
-  # mutate(TPR = TPR  + rnorm(n(), mean = 0, sd = 0.01)) %>%
-  ggplot(aes(x = nominal_fdr, y = TPR)) +
-  geom_line(aes(color = method, group = paste0(method, vals))) +
-  facet_grid(vars(de_size_cat), vars(data, vals))
-
-
 gene_info <- de_res %>%
   distinct(data, vals, genes) %>%
   unnest(genes)
 
 
 power_per_desize <- de_res %>%
-  # filter(data == "angelidis" & vals == "24m") %>%
-  # separate(method,sep = "_", into = c("method", "de_method")) %>%
-  # filter(de_method == "edgeR") %>%
   filter(str_detect(method, "edgeR")) %>%
   mutate(de_truth = map2(de, ground_truth, \(de, gt){
     d <- if("cell_type" %in% colnames(de)){
@@ -146,17 +98,12 @@ power_per_desize <- de_res %>%
   mutate(data_val = fct_reorder(data_val, n_cells)) %>%
   mutate(adj_pval = ifelse(is.na(adj_pval), 1, adj_pval)) %>%
   summarize(signif = any(adj_pval < 0.1), de_size = mean(de_size), .by = c(method, data_val, name)) 
-  # mutate(signif = adj_pval < 0.1) 
 
 power_per_desize %>%
   write_tsv(glue::glue("output/differential_expression_fdr_power-{clustering}-stratified.tsv.gz"))
 
 
-power_per_desize %>%
-  ggplot(aes(x = de_size)) + 
-    geom_histogram(aes(fill = signif), bins = 50) +
-    facet_grid(vars(method), scales = "free_y") +
-    scale_x_log10()
+
 
 #------------
 
