@@ -2,3 +2,6 @@
 .Rhistory
 .RData
 .Ruserdata
+
+# Ignore benchmark/output (as some files are big)
+benchmark/output/*
