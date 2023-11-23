@@ -364,6 +364,25 @@
       ],
       "Hash": "612c222e9a0369705e56ee482d201137"
     },
+    "ClusterR": {
+      "Package": "ClusterR",
+      "Version": "1.3.1",
+      "Source": "Repository",
+      "Repository": "CRAN",
+      "Requirements": [
+        "R",
+        "Rcpp",
+        "RcppArmadillo",
+        "ggplot2",
+        "gmp",
+        "grDevices",
+        "graphics",
+        "lifecycle",
+        "stats",
+        "utils"
+      ],
+      "Hash": "6da42c3de8d0d700df4dc5eb5c0cb11d"
+    },
     "DBI": {
       "Package": "DBI",
       "Version": "1.1.3",
@@ -498,6 +517,29 @@
         "R"
       ],
       "Hash": "e9e53a559ef99e0c02bc2f9a944f0bee"
+    },
+    "GEOquery": {
+      "Package": "GEOquery",
+      "Version": "2.66.0",
+      "Source": "Bioconductor",
+      "git_url": "https://git.bioconductor.org/packages/GEOquery",
+      "git_branch": "RELEASE_3_16",
+      "git_last_commit": "00a954e",
+      "git_last_commit_date": "2022-11-01",
+      "Requirements": [
+        "Biobase",
+        "R.utils",
+        "curl",
+        "data.table",
+        "dplyr",
+        "limma",
+        "magrittr",
+        "methods",
+        "readr",
+        "tidyr",
+        "xml2"
+      ],
+      "Hash": "7a35152550f5313c4f7a4ee0e9da8a17"
     },
     "GenomeInfoDb": {
       "Package": "GenomeInfoDb",
@@ -2655,6 +2697,17 @@
       ],
       "Hash": "4f2596dfb05dac67b9dc558e5c6fba2e"
     },
+    "gmp": {
+      "Package": "gmp",
+      "Version": "0.7-2",
+      "Source": "Repository",
+      "Repository": "CRAN",
+      "Requirements": [
+        "R",
+        "methods"
+      ],
+      "Hash": "4a55760f68f5dddec451dfac6574c1d1"
+    },
     "goftest": {
       "Package": "goftest",
       "Version": "1.2-3",
@@ -3186,14 +3239,14 @@
     },
     "lemur": {
       "Package": "lemur",
-      "Version": "1.1.2",
+      "Version": "1.1.5",
       "Source": "GitHub",
       "RemoteType": "github",
       "RemoteHost": "api.github.com",
       "RemoteUsername": "const-ae",
       "RemoteRepo": "lemur",
       "RemoteRef": "devel",
-      "RemoteSha": "e66d8ef90417e44d373a9e984abce165b53ad95c",
+      "RemoteSha": "dc2072a33c1fbefab3c425cc8b7448fe83a3ae5c",
       "Requirements": [
         "BiocGenerics",
         "BiocNeighbors",
@@ -3218,7 +3271,7 @@
         "utils",
         "vctrs"
       ],
-      "Hash": "462d91ae58400072042c1d72f1f7f385"
+      "Hash": "c71a7d29d870f71e4bdb99ef4dd7f919"
     },
     "lifecycle": {
       "Package": "lifecycle",
@@ -3391,6 +3444,19 @@
         "rlang"
       ],
       "Hash": "e2817ccf4a065c5d9d7f2cfbe7c1d78c"
+    },
+    "metapod": {
+      "Package": "metapod",
+      "Version": "1.6.0",
+      "Source": "Bioconductor",
+      "git_url": "https://git.bioconductor.org/packages/metapod",
+      "git_branch": "RELEASE_3_16",
+      "git_last_commit": "cfeaa95",
+      "git_last_commit_date": "2022-11-01",
+      "Requirements": [
+        "Rcpp"
+      ],
+      "Hash": "11e50591534d0c37308c8ddb56bf0ae0"
     },
     "mgcv": {
       "Package": "mgcv",
@@ -4457,6 +4523,22 @@
       ],
       "Hash": "a4a5ac819a467808c60e36e92ddf195e"
     },
+    "santoku": {
+      "Package": "santoku",
+      "Version": "0.10.0",
+      "Source": "Repository",
+      "Repository": "CRAN",
+      "Requirements": [
+        "R",
+        "Rcpp",
+        "assertthat",
+        "glue",
+        "lifecycle",
+        "rlang",
+        "vctrs"
+      ],
+      "Hash": "6eb59c36f063566a5ca16dc9e5ef198e"
+    },
     "sass": {
       "Package": "sass",
       "Version": "0.4.7",
@@ -4526,6 +4608,41 @@
         "scales"
       ],
       "Hash": "d316e4abb854dd1677f7bd3ad08bc4e8"
+    },
+    "scran": {
+      "Package": "scran",
+      "Version": "1.26.2",
+      "Source": "Bioconductor",
+      "git_url": "https://git.bioconductor.org/packages/scran",
+      "git_branch": "RELEASE_3_16",
+      "git_last_commit": "0cdaef6",
+      "git_last_commit_date": "2023-01-19",
+      "Requirements": [
+        "BH",
+        "BiocGenerics",
+        "BiocParallel",
+        "BiocSingular",
+        "DelayedArray",
+        "DelayedMatrixStats",
+        "Matrix",
+        "Rcpp",
+        "S4Vectors",
+        "SingleCellExperiment",
+        "SummarizedExperiment",
+        "beachmat",
+        "bluster",
+        "dqrng",
+        "edgeR",
+        "igraph",
+        "limma",
+        "metapod",
+        "methods",
+        "scuttle",
+        "statmod",
+        "stats",
+        "utils"
+      ],
+      "Hash": "ab708ab1be42d035e6d8ef12b13ec4c9"
     },
     "sctransform": {
       "Package": "sctransform",
@@ -4840,6 +4957,18 @@
         "utils"
       ],
       "Hash": "8f9764a85e3ca99604625f7ab6012418"
+    },
+    "statmod": {
+      "Package": "statmod",
+      "Version": "1.5.0",
+      "Source": "Repository",
+      "Repository": "CRAN",
+      "Requirements": [
+        "R",
+        "graphics",
+        "stats"
+      ],
+      "Hash": "26e158d12052c279bdd4ba858b80fb1f"
     },
     "stringfish": {
       "Package": "stringfish",
