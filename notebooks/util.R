@@ -79,7 +79,9 @@ small_arrow <- function(position = c(0.8, 0.95), offset = 0.01, label = NULL, di
   list(arrow, text)
 }
 
-
+scale_colour_gradient2_rev <- function(..., low = scales::muted("blue"), mid = "white", high = scales::muted("red")){
+  scale_color_gradient2(..., low = low, mid = mid, high = high)
+}
 ######### Custom plotting functions #########
 
 convert_dims <- function( width, height, units = c("inches", "in", "cm", "mm", "px"), dpi = 300, scale = 1){

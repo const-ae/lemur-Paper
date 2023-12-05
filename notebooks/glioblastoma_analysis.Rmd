@@ -22,8 +22,9 @@ if(! file.exists("../benchmark/output/glioblastoma/fit_hvg10k-small.qs")){
   hvg <- order(-rowVars(logcounts(sce)))
   sce <- sce[hvg[1:10000],]
   
-  
-  fit <- lemur::lemur(sce, design = ~ condition + patient_id, n_embedding = 50, test_fraction = 0.7)
+  set.seed(1)
+  # fit <- lemur::lemur(sce, design = ~ condition + patient_id, n_embedding = 50, test_fraction = 0.7)
+  fit <- lemur::lemur(sce, design = ~ condition + patient_id, n_embedding = 60, test_fraction = 0.4)
   reducedDim(fit, "fit_umap") <- uwot::umap(t(fit$embedding))
   fit <- lemur::align_harmony(fit)
   reducedDim(fit, "fit_al_umap") <- uwot::umap(t(fit$embedding))
@@ -49,10 +50,10 @@ if(! file.exists("../benchmark/output/glioblastoma/fit_hvg10k-small.qs")){
   glm_de <- lemur:::edger_test_de(glm_fit, contrast = c(0, 0, 0, 0, 0, 0, 0, 1))
   
   as_tibble(nei_pan) %>% arrange(did_pval)
-  as_tibble(nei_eto_tumor) %>% arrange(pval)
+  as_tibble(nei_pan_tumor) %>% arrange(pval)
   
   pan_affect_genes <- c("HIST3H2A", "CD84", "MBP", "CCL7")
-  tumor_bin_genes <- c("PDIA4")
+  tumor_bin_genes <- c("PDIA4", "HERPUD1")
   cell_type_markers <- c("CD14", "TYROBP", "PLP1", "MAG", "TRBC1", "TRBC2", "GAP43", "B2M") 
   genes_of_interest <- rowData(fit) %>%
     as_tibble() %>%
@@ -62,14 +63,15 @@ if(! file.exists("../benchmark/output/glioblastoma/fit_hvg10k-small.qs")){
   fit_small <- fit[genes_of_interest$gid,]
   nei_pan_small <- nei_pan %>% filter(name %in% filter(genes_of_interest, gene %in% pan_affect_genes)$gid)
   nei_pan_tumor_small <- nei_pan_tumor %>% filter(name %in% filter(genes_of_interest, gene %in% tumor_bin_genes)$gid)
-  
-  inside_pdia4_nei <- colnames(fit[,fit$colData$cell_type == "Tumor"]) %in% filter(nei_pan_tumor_small, name == "ENSG00000155660")$neighborhood[[1]]
-  psce_pdia4 <- glmGamPoi::pseudobulk(fit[,fit$colData$cell_type == "Tumor"], group_by = vars(patient_id, condition, inside = inside_pdia4_nei), n = n())
+  # PDIA4 ENSG00000155660 
+  # HERPUD1 ENSG00000051108
+  inside_herpud1_nei <- colnames(fit[,fit$colData$cell_type == "Tumor"]) %in% filter(nei_pan_tumor_small, name == "ENSG00000051108")$neighborhood[[1]]
+  psce_herpud1 <- glmGamPoi::pseudobulk(fit[,fit$colData$cell_type == "Tumor"], group_by = vars(patient_id, condition, inside = inside_herpud1_nei), n = n())
   
   qs::qsave(fit_small, "../benchmark/output/glioblastoma/fit_hvg10k-small.qs")
   qs::qsave(nei_pan_small, "../benchmark//output/glioblastoma/fit_hvg10k-nei_pan-small.qs")
   qs::qsave(nei_pan_tumor_small, "../benchmark//output/glioblastoma/fit_hvg10k-nei_pan_tumor-small.qs")
-  qs::qsave(psce_pdia4, "../benchmark/output/glioblastoma/fit_hvg10k-pdia4_psce.qs")
+  qs::qsave(psce_herpud1, "../benchmark/output/glioblastoma/fit_hvg10k-herpud1_psce.qs")
   qs::qsave(rowData(fit), "../benchmark/output/glioblastoma/fit_hvg10-rowdata.qs")
   qs::qsave(nei_pan %>% dplyr::select(-neighborhood), "../benchmark/output/glioblastoma/fit_hvg10-nei_pan-without_neighborhood.qs")
 }
@@ -84,7 +86,7 @@ fit_small <- qs::qread("../benchmark/output/glioblastoma/fit_hvg10k-small.qs")
 nei_pan_small <- qs::qread("../benchmark/output/glioblastoma/fit_hvg10k-nei_pan-small.qs")
 nei_pan_mod <- qs::qread("../benchmark/output/glioblastoma/fit_hvg10-nei_pan-without_neighborhood.qs")
 nei_pan_tumor_small <- qs::qread("../benchmark/output/glioblastoma/fit_hvg10k-nei_pan_tumor-small.qs")
-psce_pdia4 <- qs::qread("../benchmark/output/glioblastoma/fit_hvg10k-pdia4_psce.qs")
+psce_herpud1 <- qs::qread("../benchmark/output/glioblastoma/fit_hvg10k-herpud1_psce.qs")
 full_row_data <- qs::qread("../benchmark/output/glioblastoma/fit_hvg10-rowdata.qs")
 ```
 
@@ -189,20 +191,20 @@ pan_proj_df <- as_tibble(pan_proj[top_dirs,], rownames = "gid") %>%
 
 proj_df <- bind_rows(mutate(ctrl_proj_df, condition = "ctrl"),
                      mutate(pan_proj_df, condition = "panobinostat")) %>%
-  mutate(length = sqrt(V1^2 + V2^2),
-         V1 = V1 * 1.2,
-         V2 = V2 * 1.2)
+  # filter(gene != "HIST3H2A") %>%
+  mutate(V1 = ifelse(gene == "HIST3H2A", V1 * 20, V1),
+         V2 = ifelse(gene == "HIST3H2A", V2 * 20, V2))
 
 manual_text_pos <- tribble(
       ~gene,      ~condition,   ~V1,  ~V2, ~hjust, ~vjust,
-      "CD14",         "ctrl",   -19,   -7,     1,       0,
+      "CD14",         "ctrl",   -17,   -4,     1,       0,
    #  "CD14", "panobinostat",   -20,   -9,     1,     0.3,
       "PLP1",         "ctrl",     1,   18,   0.5,       0,
    #  "PLP1", "panobinostat",     1,   17,   0.5,       0,
-     "GAP43",         "ctrl",    21,   -9,     0,       1,
+     "GAP43",         "ctrl",    19,  -13,     0,       1,
    # "GAP43", "panobinostat",    20,   -9,     0,       1,
-  "HIST3H2A",         "ctrl",    -2,    2,     1,       0,
-  "HIST3H2A", "panobinostat",   -14,  -10,   0.2,       1,
+  "HIST3H2A",         "ctrl",   -35,    4,     0,       0,
+# "HIST3H2A", "panobinostat",   -14,  -15,   0.2,       1,
 )
 
 # eto_proj <- lemur:::grassmann_map(lemur:::sum_tangent_vectors(fit_small$coefficients, c(1, 1, 0, rep(0, times = 5))), fit_small$base_point)[,1:2]
@@ -216,19 +218,20 @@ rownames(pan_tang) <- full_row_data$gid
 
 mc_biplot <- as_tibble(colData(fit_small)) %>%
   mutate(emb = t(fit_small$embedding[1:2,])) %>%
-  ggplot(aes(x = emb[,1], y = emb[,2])) +
+  ggplot(aes(x = -emb[,1], y = -emb[,2])) +
     ggrastr::rasterize(geom_point(aes(color = cell_type), size = 0.01, stroke = 0, show.legend = FALSE), dpi = 600) +
     scale_color_manual(values = cell_type_colors) +
     ggnewscale::new_scale_colour() +
-    geom_segment(data = proj_df, aes(x = 0, y = 0, xend = V1, yend = V2, color = condition), linewidth = 1.2, show.legend = FALSE) +
+    geom_segment(data = proj_df , aes(x = 0, y = 0, xend = V1 * -200, yend = V2 * -200, color = condition), linewidth = 1.2, show.legend = FALSE) +
+    annotate("segment", x = -35, y = 3.3, xend = 0.115 * -200, yend = 0.0787 * -200, color = "#222222", linewidth = 0.4) +
+    annotate("segment", x = -14, y = 3.3, xend = 0.0193 * -200, yend = -0.0135 * -200, color = "#222222", linewidth = 0.4) +
     scale_color_manual(values = condition_colors) +
-    geom_text(data = manual_text_pos, aes(x = V1 * 1.2, y = V2 * 1.2, hjust = hjust, vjust = vjust, label = gene), size = font_size_small / .pt) +
+    geom_text(data = manual_text_pos, aes(x = V1, y = V2, hjust = hjust, vjust = vjust, label = gene), size = font_size_small / .pt) +
     coord_fixed(ylim = c(-20, 25), xlim = c(-40, 20), clip = "off") +
     labs(x = "$Z_1$", y ="$Z_2$")
     
 mc_biplot
 ```
-
 
 
 
@@ -268,42 +271,6 @@ umap_orig_pc_pl
 ```
 
 
-```{r, paged.print=FALSE}
-neg_log10_trans <- scales::trans_new("neg_log10", trans = \(x) -log10(x),  inv = \(x) 10^(-x), domain = c(1e-100, Inf))
-
-pan_volcano <- nei_pan_mod %>%
-  as_tibble() %>%
-  mutate(sel_gene = name %in% nei_pan_small$name) %>%  
-  arrange(sel_gene) %>%
-  mutate(lfc = ifelse(lfc < -4, -Inf, lfc)) %>%
-  ggplot(aes(x = lfc, y = pval)) +
-    ggrastr::rasterize(geom_point(aes(color = sel_gene, size = sel_gene), stroke = 0, show.legend = FALSE), dpi = 300) +
-    geom_hline(yintercept = max(nei_pan_mod$pval[nei_pan_mod$adj_pval < 0.1])) +
-    scale_color_manual(values = c("TRUE" = "red", "FALSE" = "black")) +
-    scale_size_manual(values = c("TRUE" = 1.2, "FALSE" = 0.6)) +
-    scale_y_continuous(limits = c(1, NA), expand = expansion(mult = c(0, 0.05)), trans = neg_log10_trans,
-                       breaks = 10^seq(0, -8, by = -2), labels = \(x) glue("$10^{{{log10(x)}}}$")) +
-    labs(x = "Log fold change", y = "p-value")
-
-# nei_pan_mod %>%
-#   # mutate(did_adj_pval2 = p.adjust(ifelse(adj_pval < 0.1, did_pval, NA), method = "BH")) %>%
-#   as_tibble() %>%
-#   ggplot(aes(x = n_cells, y = pval)) +
-#     geom_point(aes(color = did_lfc, size = did_pval < 0.01),  stroke = 0) +
-#     geom_hline(yintercept = max(nei_pan_mod$pval[nei_pan_mod$adj_pval < 0.1])) +
-#     colorspace::scale_color_continuous_diverging(limits = c(-2, 2), oob = scales::oob_squish, palette = "Purple-Green") +
-#     scale_size_manual(values = c("TRUE" = 1.2, "FALSE" = 0.6)) +
-#     scale_y_continuous(limits = c(1, NA), expand = expansion(mult = c(0, 0.05)), trans = neg_log10_trans,
-#                        breaks = 10^seq(0, -8, by = -2), labels = \(x) glue("$10^{{{log10(x)}}}$")) +
-#     scale_x_continuous(limits = c(0, NA), expand = expansion(mult = c(0, 0.05)))
-
-pan_volcano
-```
-
-
-
-
-
 
 
 ```{r, paged.print=FALSE}
@@ -328,7 +295,9 @@ de_regions_maps <- nei_pan_small %>%
   unnest(neighborhood) %>%
   left_join(tibble(umap = umap_fit, neighborhood = rownames(umap_fit)), by = "neighborhood") %>%
   left_join(as_tibble(full_row_data), by = c("name" = "gid")) %>%
-  mutate(gene = factor(gene, levels = pan_genes_order))
+  filter(gene %in% pan_genes_order) %>%
+  mutate(gene = factor(gene, levels = pan_genes_order)) 
+  
 
 de_regions_maps2 <- nei_pan_tumor_small %>%
   unnest(neighborhood) %>%
@@ -356,16 +325,16 @@ de_plots <- de_plot_data %>%
   group_map(\(data, key){
     ggplot(data, aes(x = umap[,1], y = umap[,2])) +
       ggrastr::rasterise(geom_point(aes(color = de), size = 0.05, stroke = 0, show.legend = FALSE), dpi = 600) +
-      geom_density2d(data = de_regions_maps %>% filter(gene == key[[1]]) %>% mutate(inside = "in"),  breaks = 0.2, linewidth = 0.75,
-                     contour_var = "ndensity", color = "black",
-                     h = apply(umap_fit, 2, MASS::bandwidth.nrd) * 0.9,
-                     show.legend = FALSE) +
-      scale_color_gradient2(limits = c(-1, 1), oob = scales::squish, breaks = c(-1, 0, 1)) +
+      # geom_density2d(data = de_regions_maps %>% filter(gene == key[[1]]) %>% mutate(inside = "in"),  breaks = 0.2, linewidth = 0.75,
+      #                contour_var = "ndensity", color = "black",
+      #                h = apply(umap_fit, 2, MASS::bandwidth.nrd) * 0.9,
+      #                show.legend = FALSE) +
+      scale_colour_gradient2_rev(limits = c(-1, 1), oob = scales::squish, breaks = c(-1, 0, 1)) +
       facet_wrap(vars(inside), nrow = 1, labeller = as_labeller(c("in" = "Inside Neighborhood", "out" = "Outside Neighborhood")))  +
       scale_x_continuous(limits = range(umap_fit[,1]) * 1.1) +
       scale_y_continuous(limits = range(umap_fit[,2]) * 1.1) +
       small_axis(label = "", fontsize = font_size_tiny, xlim = range(umap_fit[,1]), ylim = range(umap_fit[,2]), arrow_length = 3) +
-      theme(panel.spacing.x = unit(7, "mm")) +
+      theme(panel.spacing.x = unit(7, "mm"), plot.subtitle = element_text(margin = margin(2, 0, 0, 0, unit = "pt"))) +
       labs(subtitle = key[[1]])
   })
 
@@ -387,13 +356,14 @@ expr_plot_data <- as_tibble(colData(fit_small), rownames = "cell_id") %>%
 
 expr_plots <- expr_plot_data %>%
   filter(condition != "etoposide") %>%
-  mutate(gene = factor(gene, levels = c(pan_genes_order, "PDIA4"))) %>%
+  mutate(gene = factor(gene, levels = c(pan_genes_order, "HERPUD1"))) %>%
+  filter(! is.na(gene)) %>%
   group_by(gene) %>%
   group_map(\(data, key){
     data %>% mutate(gene = key[[1]]) %>%
       ggplot(aes(x = umap[,1], y = umap[,2])) +
       ggrastr::rasterise(geom_point(aes(color = expr), size = 0.05, stroke = 0), dpi = 300) +
-      geom_density2d(data = filter(rbind(de_regions_maps, de_regions_maps2), gene == key[[1]]), breaks = 0.1, linewidth = 0.5,
+      geom_density2d(data = filter(rbind(de_regions_maps %>% mutate(gene = as.character(gene)), de_regions_maps2), gene == key[[1]]), breaks = 0.2, linewidth = 0.5,
                      contour_var = "ndensity", color = "black",
                      h = apply(umap_fit, 2, MASS::bandwidth.nrd) * 0.9,
                      show.legend = FALSE) +
@@ -417,7 +387,7 @@ expr_plots
 ```{r, paged.print=FALSE}
 plot_assemble(add_text("Expression pattern of selected genes under panobinostat treatment", x = 1.5, y = 1.5, vjust = 1, fontsize = font_size, fontface = "bold"),
               add_plot(expr_plots, x = 0, y = 5, width = 170, height = 80),
-              width = 170, height = 80, units = "mm", show_grid_lines = FALSE, latex_support = TRUE,
+              width = 170, height = 85, units = "mm", show_grid_lines = FALSE, latex_support = TRUE,
               filename = "../plots/suppl_gene_expr_patterns.pdf")
 ```
 
@@ -470,63 +440,11 @@ comparison_pl
 
 
 
-```{r}
-row1_umap_width <- 40
-row1_umap_height <- 34
-row1_offset_top <- 12
-
-plot_assemble(
-  add_text("(A) Glioblastoma experimental design", x = 1.5, y = 1.5, vjust = 1, fontsize = font_size, fontface = "bold"),
-  add_graphic("../illustrations/glioblastoma_experiment_overview_wideArtboard 1.pdf", x = 1.5,  y = 2.5, units = "mm"),
-  
-  # add_text("(B) Alignment with LEMUR adjusting for patient and treatment effect", x = 1.5, y = 24.5, vjust = 1, fontsize = font_size, fontface = "bold"),
-  # add_plot(cowplot::get_legend(condition_legend), x = 5, y = 28 , height = 3),
-  # add_text("UMAP of $Y$", x = 0 + row1_umap_width * 0.5, y = 32, vjust = 1, hjust = 0.5, fontsize = 7),
-  # add_text("UMAP of $Z$ before alignment", x = 0 + row1_umap_width * 1.5, y = 32, vjust = 1, hjust = 0.5, fontsize = 7),
-  # add_text("UMAP of $Z$ after alignment", x = 0 + row1_umap_width * 2.5, y = 32, vjust = 1, hjust = 0.5, fontsize = 7),
-  # add_plot(umap_orig_pc_pl, x = 0 + row1_umap_width * 0, y = 33, width = row1_umap_width, height = row1_umap_height),
-  # add_plot(umap_fit_pc_pl, x = 0 + row1_umap_width * 1, y = 33, width = row1_umap_width, height = row1_umap_height),
-  # add_plot(umap_fital_pc_pl, x = 0 + row1_umap_width * 2, y = 33, width = row1_umap_width, height = row1_umap_height),
-  # 
-  # add_plot(cowplot::get_legend(cell_type_legend), x = 5, y = 67, height = 3),
-  # add_text("UMAP of $Y$", x = 0 + row1_umap_width * 0.5, y = 71, vjust = 1, hjust = 0.5, fontsize = 7),
-  # add_text("UMAP of $Z$ before alignment", x = 0 + row1_umap_width * 1.5, y = 71, vjust = 1, hjust = 0.5, fontsize = 7),
-  # add_text("UMAP of $Z$ after alignment", x = 0 + row1_umap_width * 2.5, y = 71, vjust = 1, hjust = 0.5, fontsize = 7),
-  # add_plot(umap_orig_ct_pl, x = 0 + row1_umap_width * 0, y = 72, width = row1_umap_width, height = row1_umap_height),
-  # add_plot(umap_fit_ct_pl, x = 0 + row1_umap_width * 1, y = 72, width = row1_umap_width, height = row1_umap_height),
-  # add_plot(umap_fital_ct_pl, x = 0 + row1_umap_width * 2, y = 72, width = row1_umap_width, height = row1_umap_height),
-  # 
-  # add_text("(C) Cell type assignment", x = row1_umap_width * 3, y = 24.5, vjust = 1, fontsize = font_size, fontface = "bold"),
-  # add_plot(cell_type_dot_plot , x = 120, y = 28, width = 50, height = 38),
-  # add_text("(D) Multi-condition biplot", x = row1_umap_width * 3, y = 72, vjust = 1, fontsize = font_size, fontface = "bold"),
-  # add_plot(mc_biplot, x = row1_umap_width * 3 - 3, y = 75, width = 50, height = 33),
-   
-  add_text("(E) Cluster-free differential expression. Panobinostat causes", x = 1.5, y = 107, vjust = 1, fontsize = font_size, fontface = "bold"),
-  add_graphic("../illustrations/manual_divergent_colorscaleArtboard 1.pdf", x = 85,  y = 105, units = "mm"),
-  # add_plot(pan_volcano, x = 0, y = 111, width = 36, height = 38),
-  add_plot(de_plots[[1]], x = 0, y = 110, width = 60, height = 36),
-  add_plot(comparison_pl[[1]], x = 60, y = 118, width = 25, height = 28),
-  add_plot(de_plots[[2]], x = 85, y = 110, width = 60, height = 36),
-  add_plot(comparison_pl[[2]], x = 145, y = 118, width = 25, height = 28),
-
-  # add_text("(F) Panobinostat stimulates PDIA4 up-regulation in a subpopulation of tumor cells", x = 1.5, y = 150, vjust = 1, fontsize = font_size, fontface = "bold"),
-  # add_plot(de_plots2, x = 0, y = 154, width = 61, height = 40),
-  # add_plot(comparison_pl2, x = 61, y = 154, width = 45, height = 40),
-  # add_plot(diff_pl, x = 104, y = 154, width = 25, height = 40),
-  # 
-  # add_text("(G) Subpopulation markers\n\\quad\\quad in control condition", x = 130, y = 150, vjust = 1, fontsize = font_size, fontface = "bold"),
-  # add_plot(cowplot::get_legend(volcano_enrichment_pl + labs(color = "")), x = 134, y = 156.5, width = 36, height = 4),
-  # add_plot(volcano_enrichment_pl + guides(color = "none"), x = 129, y = 160, width = 41, height = 37),
-  
-  width = 170, height = 197, units = "mm", show_grid_lines = FALSE, latex_support = TRUE,
-  filename = "../plots/glioblastoma_results.pdf")
-```
-
 
 ```{r, paged.print=FALSE}
 
 is_inside2 <- tibble(gid = rowData(fit_small)$gid, gene = rowData(fit_small)$gene, cell_id = list(colnames(fit_small))) %>%
-  filter(gid %in% "ENSG00000155660") %>%
+  filter(gid %in% "ENSG00000051108") %>%
   left_join(dplyr::select(nei_pan_tumor_small, name, neighborhood), by = c("gid"= "name")) %>%
   mutate(inside = map2(cell_id, neighborhood, \(ref, nei_cells)ref  %in% nei_cells)) %>%
   dplyr::select(-neighborhood) %>%
@@ -539,7 +457,7 @@ de_plot_data2 <- as_tibble(colData(fit_small), rownames = "cell_id") %>%
   pivot_longer(starts_with("de-"), names_sep = "-", values_to = "de", names_to = c(NA, "gid")) %>%
   inner_join(as_tibble(full_row_data), by = "gid") %>%
   inner_join(is_inside2, by = c("gid", "cell_id", "gene")) %>%
-  filter(gid == "ENSG00000155660") %>%
+  filter(gid == "ENSG00000051108") %>%
   group_by(gene) %>%
   mutate(de = scale_sym(de, ignore_extreme = 0.05)) %>%
   sample_frac(size = 1) 
@@ -550,11 +468,11 @@ de_plots2 <- de_plot_data2 %>%
   mutate(de = ifelse(cell_type == "Tumor", de, NA)) %>%
   ggplot(aes(x = umap[,1], y = umap[,2])) +
     ggrastr::rasterise(geom_point(aes(color = de), size = 0.05, stroke = 0, show.legend = FALSE), dpi = 600) +
-    geom_density2d(data = de_regions_maps2 %>% mutate(inside = "in"),  breaks = 0.2, linewidth = 0.75,
-                   contour_var = "ndensity", color = "black",
-                   h = apply(umap_fit, 2, MASS::bandwidth.nrd) * 0.9,
-                   show.legend = FALSE) +
-    scale_color_gradient2(limits = c(-1, 1), oob = scales::squish, breaks = c(-1, 0, 1), na.value = "#00000000") +
+    # geom_density2d(data = de_regions_maps2 %>% mutate(inside = "in"),  breaks = 0.3, linewidth = 0.75,
+    #                contour_var = "ndensity", color = "black",
+    #                h = apply(umap_fit, 2, MASS::bandwidth.nrd) * 0.9,
+    #                show.legend = FALSE) +
+    scale_colour_gradient2_rev(limits = c(-1, 1), oob = scales::squish, breaks = c(-1, 0, 1), na.value = "#00000000") +
     facet_wrap(vars(inside), nrow = 1, labeller = as_labeller(c("in" = "Inside Neighborhood", "out" = "Outside Neighborhood")))  +
     scale_x_continuous(limits = range(umap_fit[,1]) * 1.1) +
     scale_y_continuous(limits = range(umap_fit[,2]) * 1.1) +
@@ -567,7 +485,7 @@ de_plots2
 
 
 ```{r, paged.print = FALSE}
-genes_of_interest <- c("ENSG00000155660")
+genes_of_interest <- c("ENSG00000051108")
 
 mask <- matrix(NA, nrow = length(genes_of_interest), ncol = ncol(fit_small), 
                dimnames = list(genes_of_interest, colnames(fit_small)))
@@ -601,11 +519,12 @@ diff_df <-  comparison_data2 %>%
   pivot_wider(names_from = condition, values_from = expr)
 
 comparison_pl2 <-  comparison_data2 %>%
+  filter(patient_id != "PW029") %>%
   ggplot(aes(x = condition_short, y = expr)) +
     # geom_boxplot(outlier.shape =  NA, width = 0.3) +
     geom_line(aes(group = patient_id, x = condition_short, y = expr), color = "lightgrey", linewidth = 0.3) +
     geom_point(aes(group = condition, color = condition), position = position_dodge(width = 0.7), size = 0.8, show.legend = FALSE) +
-    geom_segment(data = diff_df, aes(x = 1.5, y = ctrl, xend = 1.5, yend = panobinostat), color = "red", linewidth = 0.8) +
+    geom_segment(data = diff_df, aes(x = 1.5, y = ctrl, xend = 1.5, yend = panobinostat), color = "red", linewidth = 0.8, arrow = arrow(type = "closed", length = unit(1, "mm"))) +
     facet_grid(cols = vars(origin), labeller = as_labeller(c("inside" = "Inside\nNeighborhood", "outside" = "Outside\nNeighborhood"))) +
     scale_color_manual(values = condition_colors) +
     scale_y_continuous(limits = c(0, NA), expand = expansion(mult = c(0, 0.05)), n.breaks = 3) +
@@ -617,23 +536,23 @@ comparison_pl2 <-  comparison_data2 %>%
 diff_pl <- diff_df %>% 
   ggplot(aes(x = origin, xend = origin, y = 0, yend = panobinostat - ctrl)) +
     geom_hline(yintercept = 0) +
-    geom_segment(color = "red", linewidth = 0.8) +
+    geom_segment(color = "red", linewidth = 0.8, arrow = arrow(type = "closed", length = unit(1, "mm"))) +
     ggsignif::geom_signif(comparison = list(c("inside", "outside")), annotations = "**", textsize = font_size_small / .pt, y_position = 1.3) +
     scale_y_continuous(limits = c(0, max(comparison_data2$expr)) - 1, expand = expansion(mult = c(0.05, 0.05)), n.breaks = 3) +
     labs(subtitle = "$ \\text{Diff. in diff.}$\n($\\Delta_{\\text{in}} - \\Delta_{\\text{out}}$)",
          y = "$\\Delta$") +
     theme(axis.title.x = element_blank(), plot.subtitle = element_text(hjust = 0.5)) 
 
-diff_pl
 comparison_pl2
+diff_pl
 ```
 
 
 ```{r, paged.print=FALSE}
-glm_fit <- glmGamPoi::glm_gp(psce_pdia4[,psce_pdia4$condition == "ctrl"], design = ~ patient_id + inside, size_factors = "ratio", verbose = TRUE)
+glm_fit <- glmGamPoi::glm_gp(psce_herpud1[,psce_herpud1$condition == "ctrl"], design = ~ patient_id + inside, size_factors = "ratio", verbose = TRUE)
 glm_de_res <- glmGamPoi::test_de(glm_fit, cond(inside = TRUE) - cond(inside = FALSE))
-glm_fit2 <- lemur:::edger_fit(counts(psce_pdia4[,psce_pdia4$condition == "ctrl"]), design = ~ patient_id + inside, col_data = colData(psce_pdia4[,psce_pdia4$condition == "ctrl"]),
-                             offset = log(glmGamPoi:::estimate_size_factors(counts(psce_pdia4[,psce_pdia4$condition == "ctrl"]), method = "ratio")))
+glm_fit2 <- lemur:::edger_fit(counts(psce_herpud1[,psce_herpud1$condition == "ctrl"]), design = ~ patient_id + inside, col_data = colData(psce_herpud1[,psce_herpud1$condition == "ctrl"]),
+                             offset = log(glmGamPoi:::estimate_size_factors(counts(psce_herpud1[,psce_herpud1$condition == "ctrl"]), method = "ratio")))
 glm_de_res2 <- lemur:::edger_test_de(glm_fit2, contrast = c(0, 0, 0, 0, 0, 0, 1))
 
 plot(glm_de_res2$lfc, glm_de_res$lfc)
@@ -649,7 +568,6 @@ as_tibble(glm_de_res) %>%
 
 
 ```{r, paged.print=FALSE}
-if(FALSE){
   ego1 <- clusterProfiler::enrichGO(gene = glm_de_res %>% slice_min(pval, n = 200) %>% pull(name), 
                                    universe = glm_de_res$name,
                                    OrgDb = org.Hs.eg.db::org.Hs.eg.db,
@@ -675,18 +593,25 @@ if(FALSE){
   as_tibble(ego1) %>% print(n = 20)
   as_tibble(ego2) %>% print(n = 20)
   as_tibble(ekegg1) %>% print(n = 20)
-}
+  
+  as_tibble(ego1) %>%
+    filter(ID  == "GO:0034976")
+
+  as_tibble(ego2) %>%
+    filter(ID  == "GO:0006754")
 ```
 
 
-
 ```{r}
+neg_log10_trans <- scales::trans_new("neg_log10", trans = \(x) -log10(x),  inv = \(x) 10^(-x), domain = c(1e-100, Inf))
+
+
 volcano_enrichment_pl <- as_tibble(glm_de_res) %>%
   mutate(er_stress_related = name %in% ego1@geneSets[["GO:0034976"]]) %>%
-  mutate(cyto_trans_related = name %in% ego1@geneSets[["GO:0002181"]]) %>%
+  mutate(atp_syn_related = name %in% ego1@geneSets[["GO:0006754"]]) %>%
   mutate(category = case_when(
     er_stress_related ~ "ER Stress",
-    cyto_trans_related ~ "Cytopl. Transl.",
+    atp_syn_related ~ "ATP biosynthesis",
     TRUE ~ "other"
   )) %>%
   arrange(desc(category)) %>%
@@ -697,7 +622,7 @@ volcano_enrichment_pl <- as_tibble(glm_de_res) %>%
     small_arrow(label = "up inside", position = c(0.7, 0.98), offset = unit(0.95, "npc"), label_offset = unit(-1.3, "mm"), fontsize = font_size_tiny) +
     small_arrow(label = "up outside",position = c(0.3, 0.02),  offset = unit(0.95, "npc"), label_offset = unit(-1.3, "mm"), fontsize = font_size_tiny) +
     geom_hline(yintercept = max(glm_de_res$pval[glm_de_res$adj_pval < 0.1])) +
-    scale_color_manual(values = c("ER Stress" = "#023FA5", "Cytopl. Transl." = "#8E063B")) +
+    scale_color_manual(values = c("ER Stress" = "#023FA5", "ATP biosynthesis" = "#8E063B")) +
     scale_y_continuous(limits = c(1, NA), expand = expansion(mult = c(0, 0.05)), trans = neg_log10_trans,
                        breaks = 10^seq(0, -11, by = -2), labels = \(x) glue("$10^{{{log10(x)}}}$")) +
     scale_x_continuous(limits = c(-3, 3)) +
@@ -718,6 +643,7 @@ dim(fit_small)
 table(nei_pan_mod$adj_pval < 0.1)
 nei_pan_tumor_small
 table(fit_small$colData$cell_type)
+sum(fit_small$colData$cell_type == "Tumor") - sum(filter(is_inside2, gene == "HERPUD1")$inside)
 ```
 
 
@@ -768,20 +694,21 @@ plot_assemble(
   add_plot(mc_biplot, x = row1_umap_width * 3 - 3, y = 75, width = 50, height = 33),
    
   add_text("(E) Cluster-free differential expression. Panobinostat causes", x = 1.5, y = 107, vjust = 1, fontsize = font_size, fontface = "bold"),
-  add_graphic("../illustrations/manual_divergent_colorscaleArtboard 1.pdf", x = 85,  y = 105, units = "mm"),
+  add_graphic("../illustrations/manual_divergent_colorscaleArtboard 1.pdf", x = 82,  y = 105, units = "mm"),
   # add_plot(pan_volcano, x = 0, y = 111, width = 36, height = 38),
   add_plot(de_plots[[1]], x = 0, y = 110, width = 60, height = 36),
   add_plot(comparison_pl[[1]], x = 60, y = 118, width = 25, height = 28),
   add_plot(de_plots[[2]], x = 85, y = 110, width = 60, height = 36),
   add_plot(comparison_pl[[2]], x = 145, y = 118, width = 25, height = 28),
 
-  add_text("(F) Panobinostat stimulates PDIA4 up-regulation in a subpopulation of tumor cells", x = 1.5, y = 150, vjust = 1, fontsize = font_size, fontface = "bold"),
+  add_text("(F) Panobinostat stimulates HERPUD1 up-regulation in a subpopulation of tumor cells", x = 1.5, y = 150, vjust = 1, fontsize = font_size, fontface = "bold"),
   add_plot(de_plots2, x = 0, y = 154, width = 61, height = 40),
   add_plot(comparison_pl2, x = 61, y = 154, width = 45, height = 40),
   add_plot(diff_pl, x = 104, y = 154, width = 25, height = 40),
 
   add_text("(G) Subpopulation markers\n\\quad\\quad in control condition", x = 130, y = 150, vjust = 1, fontsize = font_size, fontface = "bold"),
-  add_plot(cowplot::get_legend(volcano_enrichment_pl + labs(color = "")), x = 134, y = 156.5, width = 36, height = 4),
+  add_plot(cowplot::get_legend(volcano_enrichment_pl + guides(color = guide_legend(override.aes = list(size = 1))) + labs(color = "")),
+           x = 133, y = 156.5, width = 36, height = 4),
   add_plot(volcano_enrichment_pl + guides(color = "none"), x = 129, y = 160, width = 41, height = 37),
   
   width = 170, height = 197, units = "mm", show_grid_lines = FALSE, latex_support = TRUE,
