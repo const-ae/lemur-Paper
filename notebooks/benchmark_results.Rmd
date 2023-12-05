@@ -543,7 +543,8 @@ de_power_fdr_with_label <- de_power_fdr %>%
     is.na(extra_settings) ~ glue("{method} ({de_framework})"),
     !is.na(extra_settings) ~ glue("{method} ({de_framework})\nwith {extra_settings_pretty}")
   )) %>%
-  mutate(method = factor(method, levels = c("global", "celltype", "cluster", "miloDE", "lemur"))) 
+  mutate(method = factor(method, levels = c("global", "celltype", "cluster", "miloDE", "lemur"))) %>%
+  mutate(data_vals = glue::glue("{data}\n{vals}"))
   
 fdr_control_plots <- de_power_fdr_with_label %>%
   group_by(method == "lemur") %>%
@@ -562,8 +563,6 @@ fdr_control_plots <- de_power_fdr_with_label %>%
   })
 
 all_methods_power <- de_power_fdr_with_label %>%
-  
-  mutate(data_vals = glue::glue("{data}\n{vals}")) %>%
   filter(nominal_fdr == 0.1) %>%
   mutate(FDR = ifelse(is.na(FDR), 0, FDR)) %>%
   mutate(controls_fdr = mean(FDR) < nominal_fdr, .by = c(method, de_framework, extra_settings)) %>%
@@ -578,18 +577,35 @@ all_methods_power <- de_power_fdr_with_label %>%
     scale_color_manual(values = c("TRUE" = "red", "FALSE" = "lightgrey")) +
     labs(color = "FDR control on average", y = "", x = "Relative TPR") +
     theme(strip.text = element_blank(), panel.spacing.y = unit(3, "mm"))
+fdr_control_plots
+all_methods_power
+```
 
 
+```{r, paged.print = FALSE}
 plot_assemble(
-  add_plot(cowplot::plot_grid(plotlist = fdr_control_plots, ncol = 1, rel_heights = c(1,2)), x = 0, y = 0, width = 170, height = 120),
-  add_plot(all_methods_power, x = 0, y = 120, width = 130, height = 80),
+  add_text("(A) FDR control for all methods", x = 2.7, y = 2, fontsize = font_size, vjust = 1, fontface = "bold"),
+  add_plot(cowplot::plot_grid(plotlist = fdr_control_plots, ncol = 1, rel_heights = c(1,2)), x = 0, y = 5, width = 170, height = 120),
+  add_text("(B) Average power for all methods at $\\text{FDR} = 10\\%$", x = 2.7, y = 125, fontsize = font_size, vjust = 1, fontface = "bold"),
+  add_plot(all_methods_power, x = 0, y = 130, width = 130, height = 80),
 
-  
-  width = 170, height = 220, units = "mm", show_grid_lines = FALSE,
+  width = 170, height = 210, units = "mm", show_grid_lines = FALSE,
   latex_support = TRUE, filename = "../plots/suppl_all_fdr_power.pdf"
 )
 
 ```
+
+For which dataset is the FDR not controlled?
+```{r, paged.print=FALSE}
+de_power_fdr_with_label %>%
+  filter(nominal_fdr == 0.01) %>%
+  filter(is.na(es)) %>%
+  mutate(FDR = ifelse(is.na(FDR), 0, FDR)) %>%
+  filter(FDR > 0.1) %>%
+  dplyr::count(data, vals) %>%
+  arrange(desc(n))
+```
+
 
 ```{r}
 power_per_desize <- read_tsv("../benchmark/output/differential_expression_fdr_power-kmeans-stratified.tsv.gz")
