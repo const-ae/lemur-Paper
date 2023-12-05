@@ -109,4 +109,11 @@ visualize_integration <- function(params, dep_jobs, duration = "03:00:00", memor
 }
 
 
+#------------------------------------------------------------------------------------------------------
+
+calc_variance_explained <- function(params, dep_jobs, duration = "05:00:00", memory = "60GB"){
+  MyWorkflowManager::wrap_script("src/lemur_variance_explained.R", params = params, 
+                                 dependencies = dep_jobs,
+                                 duration = duration, memory = memory)
+}
 

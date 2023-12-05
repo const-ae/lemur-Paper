@@ -67,9 +67,15 @@ make_prediction_jobs <- function(dataset, variation = "small"){
   eval_jobs
 }
 
+make_variance_explained_jobs <- function(dataset, variation = "small"){
+  mem <- if(dataset %in% c("reyfman","mouse_gastrulation", "hrvatin", "goldfarbmuren"))  "160GB" else "40GB"
+  job <- prepare_data(list(dataset = dataset,  variation = variation), memory = mem) 
+  pca_dims <- c(0, 1, 2, 3, 5, 7, 10, 15, 20, 30, 40, 50, 75, 100, 150, 200)
+  calc_variance_explained(params = list(data_id = job$result_id, dataset_config = dataset, pca_dims = pca_dims),
+                          dep_jobs = list(job), memory = mem)
+}
 
-
-variation <- "cluster_holdout_hvg"
+variation <- "random_holdout_hvg"
 data_jobs <- map(datasets, \(dat) prepare_data(list(dataset = dat,  variation = variation), memory = "40GB"))
 map_chr(data_jobs, job_status)
 walk(data_jobs, run_job, priority = "normal")
@@ -89,7 +95,15 @@ stat <- map_chr(vis_jobs, job_status); table(stat)
 write_rds(vis_jobs, glue::glue("tmp/visualization_jobs-{variation}.RDS"))
 walk(vis_jobs, run_job, priority = "normal")
 
-
+var_jobs <- c(list_flatten(map(datasets, make_variance_explained_jobs, "random_holdout_hvg"), name_spec = "{outer}-{inner}"),
+              list_flatten(map(datasets, make_variance_explained_jobs, "random_holdout"), name_spec = "{outer}-{inner}"))
+stat <- map_chr(var_jobs, job_status); table(stat)
+write_rds(var_jobs, glue::glue("tmp/variance_explained_jobs.RDS"))
+walk(var_jobs, run_job, priority = "normal")
+var_jobs %>%
+  keep(\(j) job_status(j) == "done") %>%
+  map_df(\(j) read_tsv(result_file_path(j), show_col_types = FALSE)) %>%
+  write_tsv(glue::glue("output/variance_explained.tsv.gz"))
 
 get_result_table <- function(jobs){
   job_df <- tibble(name = names(jobs), job = jobs) %>%

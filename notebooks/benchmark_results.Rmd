@@ -630,6 +630,99 @@ power_per_desize_plot
 ```
 
 
+```{r, paged.print=FALSE}
+var_expl <- read_tsv("../benchmark/output/variance_explained.tsv.gz")
+
+var_expl_overall_pl <- var_expl %>%
+  filter(subset == "all") %>%
+  mutate(is_row_subset = n_genes == 500) %>%
+  ggplot(aes(x = dimensions, y = var_expl * 100)) +
+    geom_hline(yintercept = 0, linewidth = 0.3) +
+    geom_line(aes(color = method, linetype = method)) +
+    ggh4x::facet_grid2(vars(is_row_subset), vars(dataset), 
+               labeller = ggplot2::labeller(is_row_subset = as_labeller(c("TRUE" = "500 HVG", "FALSE" = "All Genes")), dataset = as_labeller(dataset_labels)),
+               strip = ggh4x::strip_vanilla(clip = "off")) +
+    scale_x_continuous(breaks = c(0, 100, 200)) +
+    scale_y_continuous(expand = expansion(mult = c(0)), breaks = c(0, 25, 50, 75, 100), limits = c(0, 100)) +
+    labs(y = "Percent variance explained", x = "Latent dimensions", color = "", linetype = "",
+         title = "(A) Variance explained") +
+    theme(legend.position = "bottom",
+          panel.grid.major.y = element_line("lightgrey", linewidth = 0.2),
+          panel.spacing.y = unit(5, "mm"), panel.spacing.x = unit(3, "mm"))
+
+# var_expl_cond_pl <- var_expl %>%
+#   filter(subset != "all") %>%
+#   mutate(subset = as.integer(as.factor(subset)), .by = c(dataset)) %>%
+#   mutate(is_row_subset = n_genes == 500) %>%
+#   ggplot(aes(x = dimensions, y = var_expl * 100)) +
+#     geom_line(aes(color = method, linetype = method, group = interaction(method, subset))) +
+#     facet_grid(vars(is_row_subset), vars(dataset), 
+#                labeller = ggplot2::labeller(is_row_subset = as_labeller(c("TRUE" = "500 HVG", "FALSE" = "All Genes")), dataset = as_labeller(dataset_labels))) +
+#     labs(y = "Percent variance explained", x = "Latent dimensions",
+#          title = "(B) Variance explained per condition")
+
+var_duration_pl1 <- var_expl %>%
+  filter(subset == "all") %>%
+  filter(dimensions > 0) %>%
+  mutate(is_row_subset = n_genes == 500) %>%
+  mutate(original_n_genes = max(n_genes), .by = dataset) %>%
+  mutate(dataset = fct_reorder(dataset, n_cells)) %>%
+  group_by(is_row_subset) %>%
+  group_map(\(data, key){
+    is_subset <- key[[1]][1]
+    data$is_row_subset <- is_subset
+    if(! is_subset){
+      data$elapsed <- data$elapsed / 60
+    }
+    ggplot(data, aes(x = dimensions, y = elapsed)) +
+      geom_hline(yintercept = 0, linewidth = 0.3) +
+      geom_hline(yintercept = c(), linewidth = 0.3) +
+      geom_line(aes(color = method, linetype = method)) +
+      ggh4x::facet_grid2(vars(is_row_subset), vars(dataset, n_cells, original_n_genes), 
+                 labeller = ggplot2::labeller(is_row_subset = as_labeller(c("TRUE" = "500 HVG", "FALSE" = "All Genes")), 
+                                              dataset = as_labeller(dataset_labels),
+                                              n_cells = as_labeller(\(x) glue("\\tiny{{$C={scales::comma_format()(as.numeric(x))}$}}")),
+                                              original_n_genes = as_labeller(\(x) glue("\\tiny{{$G={scales::comma_format()(as.numeric(x))}$}}"))),
+                 strip = ggh4x::strip_vanilla(clip = "off"), scales = "free_y") +
+      scale_x_continuous(breaks = c(0, 100, 200)) +
+      scale_y_continuous(expand = expansion(mult = c(0, 0.1))) +
+      coord_cartesian(ylim = c(0, if(is_subset) 60 else 20)) +
+      labs(y = if(is_subset) "Elapsed time [sec.]" else "Elapsed time [min.]",
+           x = "Latent dimensions", color = "", linetype = "",
+           title = "(B) Computation Time") +
+      theme(legend.position = "bottom", strip.text.x = element_text(color = if(is_subset) "#00000000" else "black", margin = margin(t = 0.3, b = 0, unit = "mm")),
+            plot.title = element_text(color = if(is_subset) "#00000000" else "black"),
+            panel.grid.major.y = element_line("lightgrey", linewidth = 0.2),
+            panel.spacing.y = unit(5, "mm"), panel.spacing.x = unit(3, "mm"))
+  })
+
+
+    
+var_expl_overall_pl 
+var_duration_pl1
+```
+
+```{r, paged.print=FALSE}
+var_expl %>%
+  filter(dataset == "goldfarbmuren") %>%
+  filter(dimensions == 50) %>%
+  filter(n_genes != 500)
+```
+
+
+
+```{r, paged.print = FALSE}
+plot_assemble(
+  add_plot(var_expl_overall_pl, x = 0, y = 0, width = 170, height = 60),
+  add_plot(var_duration_pl1[[1]] + guides(color =  "none", linetype = "none"), x = 0, y = 60, width = 170, height = 35),
+  add_plot(var_duration_pl1[[2]], x = 0, y = 85, width = 170, height = 40),
+
+  width = 170, height = 125, units = "mm", show_grid_lines = FALSE,
+  latex_support = TRUE, filename = "../plots/suppl_variance_explained.pdf"
+)
+
+```
+
 # Assemble
 
 ```{r}
