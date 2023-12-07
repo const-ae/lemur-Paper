@@ -166,6 +166,49 @@ perf_plot
 
 
 
+```{r, paged.print=FALSE}
+int_bio_df <- left_join(int_data %>%  dplyr::select(data, method, comparison, mix),
+          perf_data %>%
+            filter(metric == "ARI") %>%
+            dplyr::rename(ARI = value) %>%
+            dplyr::select(-metric), by = c("data", "method", "comparison")) %>%
+  filter(comparison == "holdout_vs_train" | method == "harmony") %>%
+  filter(method %in% c("PCA", "harmony", "lemur", "CPA")) %>%
+  mutate(method = factor(method, c("lemur", "PCA", "harmony", "CPA"))) %>%
+  mutate(avg_mix = mean(mix),
+         avg_ARI = mean(ARI), .by = c(data)) 
+  
+int_bio_pl <- int_bio_df %>%
+  summarize(mean_ARI = mean(ARI / avg_ARI),
+            se_ARI = sd(ARI / avg_ARI) / sqrt(n()),
+            mean_mix = mean(mix / avg_mix),
+            se_mix = sd(mix / avg_mix)/ sqrt(n()),
+            .by = c(method)) %>%
+  ggplot(aes(x = mean_mix, y = mean_ARI)) +
+    geom_point(data = int_bio_df, aes(x = mix / avg_mix, y = ARI  / avg_ARI, color = stage(method, after_scale = colorspace::lighten(color, 0.5)) ), size = 0.1) +
+    geom_point(aes(color = method)) +
+    geom_segment(aes(x = mean_mix - se_mix, xend = mean_mix + se_mix, y = mean_ARI, yend = mean_ARI, color = method)) +
+    geom_segment(aes(x = mean_mix, xend = mean_mix, y = mean_ARI - se_ARI, yend = mean_ARI + se_ARI, color = method)) +
+    ggrepel::geom_text_repel(aes(label = method), size = font_size_small / .pt) +
+    labs(y = "Biological signal retention (Relative ARI)",x = "Integration of conditions (Relative $k$-NN mixing)") +
+    scale_x_continuous(limits = c(0, 2), breaks = c(0, 1, 2), expand = expansion(add = c(0, 0.05))) +
+    scale_y_continuous(limits = c(0, 2), breaks = c(0, 1, 2), expand = expansion(add = c(0, 0.05))) +
+    guides(color = "none")
+
+int_bio_pl
+```
+
+```{r}
+plot_assemble(
+  add_plot(int_bio_pl, x = 110, y = 0, width = 60, height = 50),
+
+ 
+  width = 170, height = 50, units = "mm", show_grid_lines = FALSE,
+  latex_support = TRUE, filename = "../plots/alt_integration_performance.pdf"
+)
+```
+
+
 
 ```{r, paged.print = FALSE}
 kang_vis <- read_tsv("../benchmark/output/kang_visualization-random_holdout_hvg.tsv")
