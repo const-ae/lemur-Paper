@@ -91,7 +91,8 @@ full_row_data <- qs::qread("../benchmark/output/glioblastoma/fit_hvg10-rowdata.q
 ```
 
 ```{r}
-cell_type_colors <- structure(ggsci::pal_npg()(4), names = c("Tumor", "T cell", "Oligodendrocytes", "Myeloid"))
+# cell_type_colors <- structure(ggsci::pal_npg()(4), names = c("Tumor", "T cell", "Oligodendrocytes", "Myeloid"))
+cell_type_colors <- structure(c("#FAC1BD", "#ffffb3", "#80b1d3", "#b3de69"), names = c("Tumor", "T cell", "Oligodendrocytes", "Myeloid"))
 ggplot(enframe(cell_type_colors), aes(x = name, y = 1)) +
     geom_tile(aes(fill = value)) +
     scale_fill_identity()
@@ -101,31 +102,33 @@ ggplot(enframe(cell_type_colors), aes(x = name, y = 1)) +
 ```{r}
 # RColorBrewer::display.brewer.all()
 
-condition_colors<- structure(RColorBrewer::brewer.pal(n = 3, name = "Set2"), names = c("ctrl", "panobinostat", "etoposide"))
+# condition_colors<- structure(RColorBrewer::brewer.pal(n = 3, name = "Set2"), names = c("ctrl", "panobinostat", "etoposide"))
+condition_colors <- structure(c("#66c2a5", "#fc8d62", "#8da0cb"), names = c("ctrl", "panobinostat", "etoposide"))
+
 ggplot(enframe(condition_colors), aes(x = name, y = 1)) +
     geom_tile(aes(fill = value)) +
     scale_fill_identity()
 ```
 
 ```{r, paged.print = FALSE}
-# RColorBrewer::display.brewer.all()
-
-pat_cond_color_df <- tibble(patient_id = c("PW029", "PW030", "PW032", "PW034", "PW036", "PW040")) %>%
-  # mutate(ctrl_color = RColorBrewer::brewer.pal(n = 6, name = "Set2")) %>%
-  mutate(ctrl_color = colorspace::qualitative_hcl(6, palette = "Set2") ) %>%
-  mutate(panobinostat_color = colorspace::darken(ctrl_color, amount = 0.2),
-         etoposide_color = colorspace::lighten(ctrl_color, amount = 0.4)) %>%
-  pivot_longer(ends_with("color"), names_sep = "_", names_to = c("condition", ".value")) %>%
-  mutate(condition = factor(condition, levels = c("etoposide", "ctrl", "panobinostat"))) 
-
-pat_cond_color_df %>%
-  ggplot(aes(x = patient_id, y = condition)) +
-    geom_tile(aes(fill = color)) +
-    scale_fill_identity()
-
-pat_cond_color <- pat_cond_color_df %>%
-  transmute(pat_cond = paste0(patient_id, "-", condition), color = color) %>%
-  deframe()
+# # RColorBrewer::display.brewer.all()
+# 
+# pat_cond_color_df <- tibble(patient_id = c("PW029", "PW030", "PW032", "PW034", "PW036", "PW040")) %>%
+#   # mutate(ctrl_color = RColorBrewer::brewer.pal(n = 6, name = "Set2")) %>%
+#   mutate(ctrl_color = colorspace::qualitative_hcl(6, palette = "Set2") ) %>%
+#   mutate(panobinostat_color = colorspace::darken(ctrl_color, amount = 0.2),
+#          etoposide_color = colorspace::lighten(ctrl_color, amount = 0.4)) %>%
+#   pivot_longer(ends_with("color"), names_sep = "_", names_to = c("condition", ".value")) %>%
+#   mutate(condition = factor(condition, levels = c("etoposide", "ctrl", "panobinostat"))) 
+# 
+# pat_cond_color_df %>%
+#   ggplot(aes(x = patient_id, y = condition)) +
+#     geom_tile(aes(fill = color)) +
+#     scale_fill_identity()
+# 
+# pat_cond_color <- pat_cond_color_df %>%
+#   transmute(pat_cond = paste0(patient_id, "-", condition), color = color) %>%
+#   deframe()
 
 ```
 
