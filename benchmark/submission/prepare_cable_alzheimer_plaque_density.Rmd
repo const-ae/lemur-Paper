@@ -1,0 +1,167 @@
+---
+title: "R Notebook"
+---
+
+
+
+
+```{r}
+library(SingleCellExperiment)
+library(tidyverse)
+```
+
+
+Data was downloaded from https://singlecell.broadinstitute.org/single_cell/study/SCP1663
+
+Unfortunately, this cannot be automated, so you will manually need to download the files
+
+* predictive_variable_slideseq_j20_rep1.rds
+* predictive_variable_slideseq_j20_rep2.rds
+* predictive_variable_slideseq_j20_rep3.rds
+* predictive_variable_slideseq_j20_rep4.rds
+* SpatialRNA_cropped_slideseq_j20_rep1.zip
+* SpatialRNA_cropped_slideseq_j20_rep2.zip
+* SpatialRNA_cropped_slideseq_j20_rep3.zip
+* SpatialRNA_cropped_slideseq_j20_rep4.zip
+
+Unzip the zip files. Those will contain RDS files (without the file extension). Lastly, move the files into the `data/cable_spatial_plaque_data` folder.
+
+```{r}
+rep1 <- readRDS("../data/cable_spatial_plaque_data/SpatialRNA_cropped_slideseq_j20_rep1")
+rep2 <- readRDS("../data/cable_spatial_plaque_data/SpatialRNA_cropped_slideseq_j20_rep2")
+rep3 <- readRDS("../data/cable_spatial_plaque_data/SpatialRNA_cropped_slideseq_j20_rep3")
+rep4 <- readRDS("../data/cable_spatial_plaque_data/SpatialRNA_cropped_slideseq_j20_rep4")
+
+plaque_dens_rep1 <- readRDS("../data/cable_spatial_plaque_data/predictive_variable_slideseq_j20_rep1.rds")
+plaque_dens_rep2 <- readRDS("../data/cable_spatial_plaque_data/predictive_variable_slideseq_j20_rep2.rds")
+plaque_dens_rep3 <- readRDS("../data/cable_spatial_plaque_data/predictive_variable_slideseq_j20_rep3.rds")
+plaque_dens_rep4 <- readRDS("../data/cable_spatial_plaque_data/predictive_variable_slideseq_j20_rep4.rds")
+```
+
+
+
+
+```{r, paged.print = FALSE}
+common_gene_names <- intersect(intersect(rownames(rep1@counts), rownames(rep2@counts)), intersect(rownames(rep3@counts), rownames(rep4@counts)))
+
+merged_mat <- cbind(
+  rep1@counts[common_gene_names, ], 
+  rep2@counts[common_gene_names, ], 
+  rep3@counts[common_gene_names, ], 
+  rep4@counts[common_gene_names, ]
+)
+colnames(merged_mat) <- c(paste0(colnames(rep1@counts), "-rep1"),
+                          paste0(colnames(rep2@counts), "-rep2"),
+                          paste0(colnames(rep3@counts), "-rep3"),
+                          paste0(colnames(rep4@counts), "-rep4"))
+
+sce <- SingleCellExperiment(list(counts = merged_mat), colData = bind_rows(rep1@coords, rep2@coords, rep3@coords, rep4@coords) %>% magrittr::set_rownames(NULL))
+sce$sample <- rep(paste0("mouse_", 1:4), times = c(ncol(rep1@counts), ncol(rep2@counts), ncol(rep3@counts), ncol(rep4@counts)))
+logcounts(sce) <- transformGamPoi::shifted_log_transform(sce)
+sce$plaque_density <- c(plaque_dens_rep1, plaque_dens_rep2, plaque_dens_rep3, plaque_dens_rep4)
+
+# Remove lowly expressed genes
+sce <- sce[rowSums(counts(sce)) > 50, ]
+sce
+```
+
+
+Add gene ids
+```{r, paged.print = FALSE}
+eg <- clusterProfiler::bitr(rownames(sce), fromType = "SYMBOL", toType = "ENSEMBL", OrgDb="org.Mm.eg.db") %>%
+  summarize(ENSEMBL = dplyr::first(ENSEMBL), .by = SYMBOL)
+  
+rowData(sce) <- data.frame(symbol = rownames(sce)) %>%
+  tidylog::left_join(dplyr::rename(eg, symbol = SYMBOL, gene_id = ENSEMBL)) 
+```
+
+
+
+
+Add cell type labels to each cell
+
+```{r}
+brain_atlas_data_file <- "../data/cable_spatial_plaque_data/metacells.BrainCellAtlas_Saunders_version_2018.04.01.RDS"
+brain_atlas_metadata_file <- "../data/cable_spatial_plaque_data//annotation.BrainCellAtlas_Saunders_version_2018.04.01.RDS"
+if(! file.exists(brain_atlas_data_file) || ! file.exists(brain_atlas_metadata_file)){
+  # See http://dropviz.org/ for more information
+  data_url <- "https://storage.googleapis.com/dropviz-downloads/static/metacells.BrainCellAtlas_Saunders_version_2018.04.01.RDS"
+  annotation_url <- "https://storage.googleapis.com/dropviz-downloads/static/annotation.BrainCellAtlas_Saunders_version_2018.04.01.RDS"
+  
+  download.file(data_url, brain_atlas_data_file)
+  download.file(annotation_url, brain_atlas_metadata_file)
+}
+metacells_saunders <- readRDS(brain_atlas_data_file)
+metacells_annotation <- readRDS(brain_atlas_metadata_file)
+brain_ref <- SingleCellExperiment(list(counts = metacells_saunders), colData = metacells_annotation)
+logcounts(brain_ref) <- transformGamPoi::shifted_log_transform(counts(brain_ref))
+hippocampus_ref <- brain_ref[, brain_ref$tissue == "HC"]
+
+length(intersect(rownames(brain_ref), rownames(sce)))
+length(rownames(brain_ref))
+length(setdiff(rownames(sce), rownames(brain_ref)))
+# str(setdiff(rownames(sce), rownames(brain_ref)))
+
+pred <- SingleR::SingleR(sce, ref = hippocampus_ref, labels = hippocampus_ref$class)
+sce$cell_type <- pred$labels
+sce$cell_type_lumped <- fct_lump(sce$cell_type, n = 5)
+
+SingleR::plotScoreHeatmap(pred)
+```
+
+
+
+```{r}
+hist(sce$plaque_density)
+```
+
+
+Cluster plaque density
+```{r}
+clustering <- santoku::chop_evenly(sce$plaque_density, intervals = 5)
+sce$plaque_cluster <- clustering
+colData(sce)
+```
+
+
+```{r, paged.print=FALSE}
+qc_df <- scuttle::perCellQCMetrics(sce, subsets = list(Mito = str_starts(rowData(sce)$symbol, "mt-")))
+hist(qc_df$subsets_Mito_percent, breaks = 100)
+hist(qc_df$sum, breaks = 100)
+
+sce_subset <- sce[, qc_df$sum > 200 & qc_df$sum <= 5000 & qc_df$subsets_Mito_percent < 20]
+sce_subset
+```
+
+
+
+Calculate UMAP
+```{r, paged.print=FALSE}
+umap <- scater::calculateUMAP(sce_subset)
+reducedDim(sce_subset, withDimnames = FALSE) <- umap
+
+as_tibble(colData(sce_subset)) %>%
+  mutate(umap = umap) %>%
+  ggplot(aes(x = umap[,1], y = umap[,2])) +
+    geom_point(aes(color = sample), size = 0.3, stroke = 0) +
+    guides(color = guide_legend(override.aes = list(size = 1)))
+
+as_tibble(colData(sce_subset)) %>%
+  mutate(umap = umap) %>%
+  ggplot(aes(x = umap[,1], y = umap[,2])) +
+    geom_point(aes(color = cell_type_lumped), size = 0.3, stroke = 0) +
+    guides(color = guide_legend(override.aes = list(size = 1)))
+
+as_tibble(colData(sce_subset)) %>%
+  mutate(umap = umap) %>%
+  ggplot(aes(x = umap[,1], y = umap[,2])) +
+    geom_point(aes(color = plaque_density), size = 0.3, stroke = 0) +
+    scale_color_viridis_b()
+```
+
+
+
+```{r}
+qs::qsave(sce_subset, "../data/cable_spatial_plaque_data/annotated_sce.qs")
+```
+

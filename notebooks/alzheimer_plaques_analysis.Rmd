@@ -1,0 +1,240 @@
+---
+title: "R Notebook"
+---
+
+
+```{r}
+library(tidyverse)
+library(glue)
+library(SingleCellExperiment)
+source("util.R")
+```
+
+
+# Run on the cluster for memory reasons
+
+```{r}
+sce <- qs::qread("../benchmark/output/cable_spatial_plaque_data/annotated_sce.qs")
+sce
+```
+
+```{r}
+cont2ordered <- function(x, n, from = min(x), to = max(x), add_label = TRUE, label_fmt = "%.2f"){
+  groups <- seq(from, to, length.out = n+1)
+  res <- rep(NA_integer_, length(x))
+  labels <- rep(NA_character_, n)
+  for(idx in seq_len(n)){
+    if(idx == n){
+      labels[idx] <- paste0("[", sprintf(label_fmt, groups[idx]), ",", sprintf(label_fmt, groups[idx+1]), "]")
+      res[x >= groups[idx] & x <= groups[idx+1]] <- idx
+    }else{
+      labels[idx] <- paste0("[", sprintf(label_fmt, groups[idx]), ",", sprintf(label_fmt, groups[idx+1]), ")")
+      res[x >= groups[idx] & x < groups[idx+1]] <- idx
+    }
+  }
+  if(add_label){
+    ordered(res, levels = seq_len(n), labels = labels)
+  }else{
+    res
+  }
+}
+
+cont2ordered(seq(0, 30), n = 6, label_fmt = "%.f")
+levels(cont2ordered(sce$plaque_density, n = 10, label_fmt = "%.2f"))
+```
+
+
+
+```{r}
+sce$plaque_cluster <- cont2ordered(sce$plaque_density, n = 10, label_fmt = "%.2f")
+set.seed(1)
+fit <- lemur::lemur(sce, design = ~ plaque_cluster, n_embedding = 30, test_fraction = 0.6)
+set.seed(1)
+fit <- lemur::align_harmony(fit)
+```
+
+
+```{r}
+fit <- lemur::test_de(fit, cond(plaque_cluster = "[0.90,1.00]") - cond(plaque_cluster = "[0.00,0.10)"))
+set.seed(1)
+nei <- lemur::find_de_neighborhoods(fit, group_by = vars(plaque_cluster, sample), test_method = "edgeR")
+```
+
+# Make pretty plots
+
+```{r}
+fit <- qs::qread("../benchmark/output/cable_spatial_plaque_data/fit_small.qs")
+nei <- qs::qread("../benchmark/output/cable_spatial_plaque_data/fit_small_nei.qs")
+```
+
+
+
+```{r}
+mouse_labels <- structure(paste0("Mouse ", 1:4), names = paste0("mouse_", 1:4))
+```
+
+
+
+```{r, paged.print=FALSE}
+spatial_plaq_dens_pl <- as_tibble(colData(fit)) %>%
+  ggplot(aes(x = x, y = y)) +
+    ggrastr::rasterize(geom_point(aes(color = plaque_density), size = 0.05, stroke = 0), dpi = 600) +
+    scale_color_gradient(low = "lightgrey", high = "darkorange", limits = c(0, 1), breaks = c(0, 0.5, 1)) +
+    facet_wrap(vars(sample), labeller = as_labeller(mouse_labels)) +
+    small_axis(label = "spatial\ncoordinates") +
+    labs(color = "Plaque density") +
+    guides(color = guide_colorbar(barheight = unit(1, "mm"))) +
+    theme(legend.position = "top")
+
+spatial_plaq_dens_pl
+```
+
+
+```{r}
+umap <- reducedDim(fit, "embeddingUMAP")
+
+as_tibble(colData(fit)) %>%
+  mutate(umap = umap) %>%
+  ggplot(aes(x = umap[,1], y = umap[,2])) +
+    geom_point(aes(color = sample), size = 0.3, stroke = 0) +
+    guides(color = guide_legend(override.aes = list(size = 1)))
+
+as_tibble(colData(fit)) %>%
+  mutate(umap = umap) %>%
+  ggplot(aes(x = umap[,1], y = umap[,2])) +
+    geom_point(aes(color = cell_type_lumped), size = 0.3, stroke = 0) +
+    guides(color = guide_legend(override.aes = list(size = 1)))
+
+
+```
+
+```{r}
+umap_plt <- as_tibble(colData(fit)) %>%
+  mutate(umap = umap) %>%
+  ggplot(aes(x = umap[,2], y = umap[,1])) +
+    ggrastr::rasterize(geom_point(aes(color = plaque_density), size = 0.05, stroke = 0, show.legend = FALSE), dpi = 600) +
+    scale_color_gradient(low = "lightgrey", high = "darkorange", limits = c(0, 1), breaks = c(0, 0.5, 1))  +
+    small_axis(label = "UMAP")
+
+umap_plt
+```
+
+
+
+```{r, paged.print=FALSE}
+genes_of_interest <- nei$name[1]
+mask <- matrix(NA, nrow = length(genes_of_interest), ncol = ncol(fit), 
+               dimnames = list(genes_of_interest, colnames(fit)))
+mask2 <- matrix(1, nrow = length(genes_of_interest), ncol = ncol(fit), 
+               dimnames = list(genes_of_interest, colnames(fit)))
+for(id in genes_of_interest){
+  mask[id, filter(nei, name == id)$neighborhood[[1]]] <- 1
+  mask2[id, filter(nei, name == id)$neighborhood[[1]]] <- NA
+}
+
+psce2 <- glmGamPoi::pseudobulk(SingleCellExperiment(list(inside = as.matrix(logcounts(fit)[genes_of_interest,,drop=FALSE] * mask),
+                                                        outside = as.matrix(logcounts(fit)[genes_of_interest,,drop=FALSE] * mask2))),
+                      group_by = vars(sample, plaque_cluster), n = n(),
+                      aggregation_functions = list(.default = \(...) matrixStats::rowMeans2(..., na.rm = TRUE)),
+                      col_data = as.data.frame(colData(fit)))
+
+comparison_data <- as_tibble(colData(psce2)) %>%
+  mutate(expr_inside = as_tibble(t(assay(psce2, "inside"))),
+         expr_outside = as_tibble(t(assay(psce2, "outside")))) %>%
+  unpack(starts_with("expr"), names_sep = "-") %>%
+  pivot_longer(starts_with("expr"), names_sep = "[-_]", names_to = c(".value", "origin", "symbol")) 
+
+
+
+expr_comparison_pl <- comparison_data %>%
+  mutate(plaque_cluster = ordered(plaque_cluster, levels = levels(fit$colData$plaque_cluster))) %>% 
+  ggplot(aes(x = plaque_cluster, y = expr)) +
+    geom_point(aes(color = origin), size = 0.3) +
+    geom_smooth(aes(color = origin, x = as.integer(plaque_cluster)), span = 1.5, se = FALSE, linewidth = 2) +
+    scale_color_manual(values = c("inside" = "black", "outside" = "lightgrey")) +
+    scale_y_continuous(limits = c(0, 0.3), expand = expansion(add = 0)) +
+    guides(x = guide_axis(angle = 45)) +
+    theme(axis.title.x = element_blank(), legend.position = "bottom") +
+    labs(color = "", y = "Expression")
+
+expr_comparison_pl
+```
+
+
+```{r, paged.print=FALSE}
+scale_sym <- function(x, ignore_extreme = 0){
+  abs_max <- max(abs(quantile(x, c(ignore_extreme, 1-ignore_extreme))))
+  x / abs_max
+}
+
+is_inside <- tibble(symbol = genes_of_interest, cell_id = list(colnames(fit))) %>%
+  left_join(dplyr::select(nei, name, neighborhood), by = c("symbol"= "name")) %>%
+  mutate(inside = map2(cell_id, neighborhood, \(ref, nei_cells) ref %in% nei_cells)) %>%
+  dplyr::select(-neighborhood) %>%
+  unnest(c(inside, cell_id))
+
+de_plot_data <- as_tibble(colData(fit), rownames = "cell_id") %>%
+  mutate(umap = umap) %>%
+  mutate(de = as_tibble(t(assay(fit[genes_of_interest,], "DE")))) %>%
+  unnest(de, names_sep = "-") %>%
+  pivot_longer(starts_with("de-"), names_sep = "-", values_to = "de", names_to = c(NA, "symbol")) %>%
+  inner_join(is_inside, by = c("symbol", "cell_id")) %>%
+  group_by(symbol) %>%
+  mutate(de = scale_sym(de, ignore_extreme = 0.05)) %>%
+  sample_frac(size = 1) 
+
+jun_de_pl <- de_plot_data %>%
+  mutate(inside = ifelse(inside, "in", "out")) %>%
+  mutate(inside = factor(inside, levels = c("in", "out")))  %>%
+  ggplot(aes(x = umap[,2], y = umap[,1])) +
+    ggrastr::rasterise(geom_point(aes(color = de), size = 0.05, stroke = 0, show.legend = FALSE), dpi = 600) +
+    scale_colour_gradient2_rev(limits = c(-1, 1), oob = scales::squish, breaks = c(-1, 0, 1), na.value = "#00000000") +
+    facet_grid(vars(inside), labeller = labeller(inside = as_labeller(c("in" = "Inside Neighborhood", "out" = "Outside Neighborhood"))),
+               switch="y") +
+    small_axis("UMAP") 
+
+jun_de_pl
+```
+
+
+
+
+
+```{r, paged.print=FALSE}
+rel_plt <- colData(fit) %>%
+  as_tibble(rownames = "cell_id") %>%
+  left_join(is_inside) %>%
+  dplyr::count(plaque_cluster, symbol, inside) %>%
+  mutate(frac = n / sum(n), .by = c(symbol, inside)) %>%
+  mutate(plaque_cluster = fct_relabel(plaque_cluster, \(x) str_replace(x, ",", ", "))) %>%
+  ggplot(aes(x = plaque_cluster, y = frac)) +
+    geom_col(aes(fill = inside), position = position_dodge2()) +
+    scale_y_continuous(expand = expansion(mult = c(0, 0.1))) +
+    scale_x_discrete(position = "top") +
+    scale_fill_manual(values = c("TRUE" = "black", "FALSE" = "lightgrey")) +
+    guides(x = guide_axis(angle = 90)) +
+    theme(axis.title.x = element_blank(), legend.position = "bottom") +
+    labs(color = "", y = "Rel. No. Cells")
+rel_plt
+```
+
+
+
+
+```{r}
+plot_assemble(
+  add_text("(D) Alzheimer plaque density", x = 2.7, y = 1, fontsize = font_size, vjust = 1, fontface = "bold"),
+  add_plot(cowplot::get_legend(spatial_plaq_dens_pl + theme(legend.text = element_text(size = font_size)) + labs(color = "")), x = 43, y = 1, height = 5),
+  add_plot(spatial_plaq_dens_pl + guides(color = "none"), x = 0, y = 3, width = 60, height = 63),
+  add_plot(umap_plt, x = 52, y = 3, width = 40, height = 63),
+  add_text("(E) Expression of \\emph{Jun} depends on the plaque density",
+           x = 95, y = 1, fontsize = font_size, vjust = 1, fontface = "bold"),
+  add_plot(jun_de_pl, x = 95, y = 3, width = 25, height = 63),
+  add_plot(expr_comparison_pl + guides(color = "none") + theme(axis.text.x = element_blank()), x = 120, y = 5, width = 50, height = 30),
+  add_plot(rel_plt + guides(fill = "none"), x = 120, y = 34, width = 50, height = 26),
+  add_plot(cowplot::get_legend(expr_comparison_pl), x = 135, y = 60, width = 60, height = 5),
+  width = 170, height = 65, units = "mm", show_grid_lines = FALSE,
+  latex_support = TRUE, filename = "../plots/continuous_covar_figure_part2.pdf"
+)
+
+```
