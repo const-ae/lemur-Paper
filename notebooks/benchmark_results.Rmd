@@ -619,11 +619,14 @@ de_power_fdr_with_label %>%
 ```
 
 
-```{r}
+```{r,paged.print=FALSE}
 power_per_desize <- read_tsv("../benchmark/output/differential_expression_fdr_power-kmeans-stratified.tsv.gz")
 
 
 power_per_desize_plot <- power_per_desize %>%
+  mutate(extra_settings = ifelse(str_starts(method, "lemur_edgeR_"), str_remove(method, "lemur_edgeR_"), NA)) %>%
+  separate(method, into = c("method", "de_framework")) %>%
+  filter(de_framework == "edgeR" & is.na(extra_settings)) %>%
   mutate(method = factor(method, levels = c("lemur", "global",  "cluster", "celltype", "miloDE"),
                          labels = c("LEMUR", "Global", "Cluster*", "Cell type*", "miloDE*"))) %>%
   ggplot(aes(x = de_size)) + 
@@ -631,7 +634,7 @@ power_per_desize_plot <- power_per_desize %>%
     geom_histogram(aes(fill = signif), bins = 30, show.legend = FALSE) +
     ggh4x::facet_grid2(rows = vars(method), strip = ggh4x::strip_vanilla(clip = "off")) +
     scale_fill_manual(values = c("TRUE" = "darkblue", "FALSE" = "lightgrey")) +
-    scale_x_log10(limits = c(50, NA)) +
+    scale_x_log10(limits = c(50, NA), labels = scales::label_comma()) +
     scale_y_continuous(expand = expansion(add = c(0, 10)), breaks = c(0, 100, 200)) +
     labs(title = "(K) Power by no. cell with expr. change",
          subtitle = "Fraction of simulated genes (\\textcolor{gray!60!black}{grey}) with $\\min \\textrm{FDR}_{g:} < 0.1$ (\\textcolor{blue!60!black}{blue})",
