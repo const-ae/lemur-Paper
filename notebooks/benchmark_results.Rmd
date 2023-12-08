@@ -118,52 +118,29 @@ plot_assemble(
 ```
 
 
-```{r, paged.print = FALSE}
-int_data %>%
-  mutate(celltypeSS_over_batchSS = celltypeSS_over_totalSS / batchSS_over_totalSS) %>%
-  dplyr::select(data, method, comparison, celltypeSS_over_batchSS) %>%
-  filter(comparison == "holdout_vs_train" | method == "harmony") %>%
-  filter(method %in% c("PCA", "harmony", "lemur", "CPA")) %>%
-  mutate(method = factor(method, c("lemur", "PCA", "harmony", "CPA"))) %>%
-  mutate(method = fct_rev(method)) %>%
-  mutate(mean_value = mean(celltypeSS_over_batchSS), .by = c(data)) %>%
-  mutate(rel_perf = celltypeSS_over_batchSS / mean_value) %>% 
-  ggplot(aes(x = rel_perf, y = method)) +
-    geom_vline(xintercept = 1, linewidth = 0.3, color = "black") +
-    ggbeeswarm::geom_quasirandom(color = "grey", width = 0.2, size = 0.5) +
-    stat_summary(geom = "pointrange", fun.data = mean_se, color = "red", size = 0.4) +
-    small_arrow(position = c(0.9, 0.99), offset = 0.03) +
-    scale_x_continuous(expand = expansion(mult = c(0, 0.1))) + #, limits = c(0, 2), breaks = c(0, 1, 2)) +
-    theme(axis.title.y = element_blank(), plot.title.position = "plot") +
-    labs(title = "(B) Integration performance", x = "Score relative to mean performance across 13 datasets")
+
+
+```{r,paged.print=FALSE}
+bootstrap <- function(data, FUN, n_iterations = 1000, map_fun = purrr::map){
+  n <- nrow(data)
+  tibble(bootstrap_iteration = seq_len(n_iterations),
+         value = map_fun(seq_len(n_iterations), \(idx){
+            sel <- sample.int(n, size = n, replace = TRUE)
+            FUN(data[sel,])
+          }))
+}
+
+faithful %>%
+  as_tibble() %>%
+  mutate(group = eruptions < 3) %>%
+  reframe(means = bootstrap(cbind(eruptions, waiting), \(mat) matrix(colMeans(mat), nrow = 1), n_iterations = 100),
+          .by = group) %>%
+  unpack(means) %>%
+  unnest(value) %>%
+  ggplot(aes(x = value[,1], y = value[,2])) +
+    geom_density2d(aes(color = group)) +
+    geom_point(data = faithful, aes(x = eruptions, y = waiting))
 ```
-
-
-```{r, paged.print = FALSE}
-perf_plot <- perf_data %>%
-  filter(metric %in% c("ARI", "mix")) %>%
-  filter(comparison == "holdout_vs_train" | method == "harmony") %>%
-  filter(method %in% c("PCA", "harmony", "lemur", "CPA")) %>%
-  mutate(method = factor(method, c("lemur", "PCA", "harmony", "CPA"))) %>%
-  mutate(method = fct_rev(method)) %>%
-  mutate(metric = factor(metric, levels = c("mix", "ARI"))) %>%
-  mutate(mean_value = mean(value), .by = c(data, metric)) %>%
-  mutate(rel_perf = value / mean_value) %>%
-  ggplot(aes(x = rel_perf, y = method)) +
-    geom_vline(xintercept = 1, linewidth = 0.3, color = "black") +
-    ggbeeswarm::geom_quasirandom(color = "grey", width = 0.2, size = 0.5) +
-    stat_summary(geom = "pointrange", fun.data = mean_se, color = "red", size = 0.4) +
-    small_arrow(position = c(0.9, 0.99), offset = 0.03) +
-    facet_wrap(vars(metric), nrow = 2,  labeller = as_labeller(c("ARI" = "Biological signal retention (ARI)",
-                                                                 "mix" = "Integration of conditions ($k$-NN mixing)"))) +
-    scale_x_continuous(expand = expansion(mult = c(0, 0.1)), limits = c(0, 2), breaks = c(0, 1, 2)) +
-    scale_y_discrete(labels = c("lemur" = "LEMUR", "CPA" = "CPA", "PCA" = "PCA", "harmony" = "harmony")) +
-    theme(axis.title.y = element_blank(), plot.title.position = "plot") +
-    labs(title = "(B) Integration performance", x = "Relative performance across 13 datasets")
-
-perf_plot
-```
-
 
 
 ```{r, paged.print=FALSE}
@@ -178,34 +155,26 @@ int_bio_df <- left_join(int_data %>%  dplyr::select(data, method, comparison, mi
   mutate(avg_mix = mean(mix),
          avg_ARI = mean(ARI), .by = c(data)) 
   
+set.seed(1)
 int_bio_pl <- int_bio_df %>%
-  summarize(mean_ARI = mean(ARI / avg_ARI),
-            se_ARI = sd(ARI / avg_ARI) / sqrt(n()),
-            mean_mix = mean(mix / avg_mix),
-            se_mix = sd(mix / avg_mix)/ sqrt(n()),
-            .by = c(method)) %>%
-  ggplot(aes(x = mean_mix, y = mean_ARI)) +
-    geom_point(data = int_bio_df, aes(x = mix / avg_mix, y = ARI  / avg_ARI, color = stage(method, after_scale = colorspace::lighten(color, 0.5)) ), size = 0.1) +
-    geom_point(aes(color = method)) +
-    geom_segment(aes(x = mean_mix - se_mix, xend = mean_mix + se_mix, y = mean_ARI, yend = mean_ARI, color = method)) +
-    geom_segment(aes(x = mean_mix, xend = mean_mix, y = mean_ARI - se_ARI, yend = mean_ARI + se_ARI, color = method)) +
-    ggrepel::geom_text_repel(aes(label = method), size = font_size_small / .pt) +
+  mutate(method = as.character(method)) %>%
+  reframe(bootstrap_samples = bootstrap(cbind(mix / avg_mix, ARI / avg_ARI), \(mat) matrix(colMeans(mat), nrow = 1), n_iterations = 1000),
+        .by = c(method, comparison)) %>%
+  unpack(bootstrap_samples) %>%
+  unnest(value) %>%
+  ggplot(aes(x = value[,1], y = value[,2])) +
+    geom_density2d(aes(color = method), adjust = 3, contour_var = "ndensity", breaks = seq(0.9, 0.2, length.out = 3)) +
+    # geom_point(data = int_bio_df, aes(x =  mix / avg_mix, y = ARI / avg_ARI, color = stage(method, after_scale = colorspace::lighten(colour, 0.3))), size = 0.1) +
+    ggrepel::geom_text_repel(data = . %>% summarize(value = matrix(colMeans(value), nrow = 1), .by = method), aes(label = method_labels[method]), 
+                             size = font_size_small / .pt, point.padding = unit(2, "mm") ) +
+    annotation_custom(grid::polylineGrob(x = c(0.91, 0.99), y = c(0.91, 0.99), gp = grid::gpar(fill = "black"), arrow =  grid::arrow(ends = "last", type = "closed", angle = 20, length = unit(10 / 7, "mm")))) +
     labs(y = "Biological signal retention (Relative ARI)",x = "Integration of conditions (Relative $k$-NN mixing)") +
     scale_x_continuous(limits = c(0, 2), breaks = c(0, 1, 2), expand = expansion(add = c(0, 0.05))) +
-    scale_y_continuous(limits = c(0, 2), breaks = c(0, 1, 2), expand = expansion(add = c(0, 0.05))) +
-    guides(color = "none")
+    scale_y_continuous(limits = c(0, 1.7), breaks = c(0, 1), expand = expansion(add = c(0, 0.05))) +
+    guides(color = "none") +
+    coord_fixed() 
 
 int_bio_pl
-```
-
-```{r}
-plot_assemble(
-  add_plot(int_bio_pl, x = 110, y = 0, width = 60, height = 50),
-
- 
-  width = 170, height = 50, units = "mm", show_grid_lines = FALSE,
-  latex_support = TRUE, filename = "../plots/alt_integration_performance.pdf"
-)
 ```
 
 
@@ -771,7 +740,8 @@ plot_assemble(
 ```{r}
 plot_assemble(
   add_plot(kang_plot, x = 0, y = 0, width = 110, height = 50),
-  add_plot(perf_plot, x = 110, y = 0, width = 60, height = 50),
+  add_text("(B) Integration Performance", x = 111.5, y = 1.5, fontsize = font_size, vjust = 1, fontface = "bold"),
+  add_plot(int_bio_pl, x = 110, y = 5, width = 60, height = 45),
 
   add_plot(kang_plot_cell_type, x = 0, y = 50, width = 30, height = 37),
   add_plot(ct_scatter_plot + guides(color = "none"), x = 27, y = 50, width = 83, height = 40),
