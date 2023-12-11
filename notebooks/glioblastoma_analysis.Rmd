@@ -158,7 +158,7 @@ cell_type_dot_plot <- as_tibble(as.matrix(t(expr_mat))) %>%
   left_join(ct_marker_genes, by = c("gene_name" = "gene")) %>%
   ggplot() +
     geom_point(aes(x = cell_type_short, y = gene_name, color = log2(mean_expr + 1), size = frac_expr), stroke = 0) +
-    geom_rect(data = ct_marker_genes, aes(xmin = 0.7, xmax = 0.75, ymin = -Inf, ymax=Inf, fill = cell_type_marker), show.legend=FALSE) +
+    geom_rect(data = ct_marker_genes, aes(xmin = 0.6, xmax = 0.75, ymin = -Inf, ymax=Inf, fill = cell_type_marker), show.legend=FALSE) +
     facet_grid(rows = vars(cell_type_marker), scales = "free_y") +
     colorspace::scale_color_continuous_sequential(limits = c(0, NA), breaks = c(0, 2, 4)) +
     scale_fill_manual(values = cell_type_colors) +
@@ -166,12 +166,12 @@ cell_type_dot_plot <- as_tibble(as.matrix(t(expr_mat))) %>%
     scale_x_discrete(expand = expansion(add = 0.3)) +
     scale_y_discrete(expand = expansion(add = 0.4)) +
     coord_cartesian(clip = "off") +
-    guides(color = guide_colorbar(barheight = unit(1, "mm"), barwidth = unit(5, "mm")),
-           size = guide_bins()) +
-    theme(axis.title = element_blank(), legend.position = c(-0.2,-0.2), legend.direction = "horizontal",
+    guides(color = guide_colorbar(barheight = unit(1, "mm"), barwidth = unit(5, "mm"), title.vjust = 0.25, label.position = "top", label.vjust = -2),
+           size = guide_bins(label.vjust = -11)) +
+    theme(axis.title = element_blank(), legend.position = c(-0.38,-0.2), legend.direction = "horizontal",
           legend.box = "horizontal", legend.text = element_text(size = font_size_tiny),
           strip.background = element_blank(), strip.text = element_blank(), panel.spacing.y = unit(3, "mm")) +
-    labs(size = "$\\text{frac}[y \\neq 0]$", color = "$\\log_2(\\bar{y} + 1)$")
+    labs(size = "$\\text{frac}[y \\neq 0]$", color = "expr.")
 
 cell_type_dot_plot
 ```
@@ -230,7 +230,8 @@ mc_biplot <- as_tibble(colData(fit_small)) %>%
     annotate("segment", x = -14, y = 3.3, xend = 0.0193 * -200, yend = -0.0135 * -200, color = "#222222", linewidth = 0.4) +
     scale_color_manual(values = condition_colors) +
     geom_text(data = manual_text_pos, aes(x = V1, y = V2, hjust = hjust, vjust = vjust, label = gene), size = font_size_small / .pt) +
-    coord_fixed(ylim = c(-20, 25), xlim = c(-40, 20), clip = "off") +
+    # coord_fixed(ylim = c(-20, 25), xlim = c(-40, 20), clip = "off") +
+    small_axis(label = "$Z$ space", xlim = c(-40, 20), ylim = c(-27, 32)) +
     labs(x = "$Z_1$", y ="$Z_2$")
     
 mc_biplot
@@ -336,9 +337,7 @@ de_plots <- de_plot_data %>%
       facet_wrap(vars(inside), nrow = 1, labeller = as_labeller(c("in" = "Inside Neighborhood", "out" = "Outside Neighborhood")))  +
       scale_x_continuous(limits = range(umap_fit[,1]) * 1.1) +
       scale_y_continuous(limits = range(umap_fit[,2]) * 1.1) +
-      small_axis(label = "", fontsize = font_size_tiny, xlim = range(umap_fit[,1]), ylim = range(umap_fit[,2]), arrow_length = 3) +
-      theme(panel.spacing.x = unit(7, "mm"), plot.subtitle = element_text(margin = margin(2, 0, 0, 0, unit = "pt"))) +
-      labs(subtitle = key[[1]])
+      small_axis(label = "", fontsize = font_size_tiny, xlim = range(umap_fit[,1]), ylim = range(umap_fit[,2]), arrow_length = 3)
   })
 
 de_plots
@@ -432,7 +431,7 @@ comparison_pl <- as_tibble(colData(psce)) %>%
       scale_y_continuous(limits = c(0, NA), expand = expansion(mult = c(0, 0.1)), n.breaks = 3) +
       coord_cartesian(clip = "off") +
       guides(x = guide_axis(angle = 90)) +
-      theme(axis.title = element_blank(), strip.background = element_blank(), strip.text = element_blank(),
+      theme(axis.title.x = element_blank(), strip.background = element_blank(), strip.text = element_blank(),
             axis.text = element_text(size = font_size_tiny),
             panel.spacing.x = unit(25, "mm")) 
   })
@@ -571,37 +570,37 @@ as_tibble(glm_de_res) %>%
 
 
 ```{r, paged.print=FALSE}
-  ego1 <- clusterProfiler::enrichGO(gene = glm_de_res %>% slice_min(pval, n = 200) %>% pull(name), 
-                                   universe = glm_de_res$name,
-                                   OrgDb = org.Hs.eg.db::org.Hs.eg.db,
-                                   keyType = "ENSEMBL",
-                                   readable = TRUE,
-                                   ont = "ALL")
-  
-  ego2 <- clusterProfiler::enrichGO(gene = glm_de_res %>% filter(lfc < -0.3) %>% slice_min(pval, n = 200) %>% pull(name), 
-                                   universe = glm_de_res$name,
-                                   OrgDb = org.Hs.eg.db::org.Hs.eg.db,
-                                   keyType = "ENSEMBL",
-                                   readable = TRUE,
-                                   ont = "ALL")
-  ekegg1 <- clusterProfiler::enrichKEGG(gene = glm_de_res %>% slice_min(pval, n = 200) %>% 
-                                          pull(name) %>% 
-                                          clusterProfiler::bitr(fromType = "ENSEMBL", toType = "ENTREZID", OrgDb = org.Hs.eg.db::org.Hs.eg.db, drop=TRUE) %>% 
-                                          pull(ENTREZID), 
-                                   universe = clusterProfiler::bitr(glm_de_res$name, fromType = "ENSEMBL", toType = "ENTREZID", OrgDb = org.Hs.eg.db::org.Hs.eg.db, drop=TRUE)$ENTREZID,
-                                   organism = "hsa",
-                                   keyType = "kegg")
-  
-  
-  as_tibble(ego1) %>% print(n = 20)
-  as_tibble(ego2) %>% print(n = 20)
-  as_tibble(ekegg1) %>% print(n = 20)
-  
-  as_tibble(ego1) %>%
-    filter(ID  == "GO:0034976")
+ego1 <- clusterProfiler::enrichGO(gene = glm_de_res %>% slice_min(pval, n = 200) %>% pull(name), 
+                                 universe = glm_de_res$name,
+                                 OrgDb = org.Hs.eg.db::org.Hs.eg.db,
+                                 keyType = "ENSEMBL",
+                                 readable = TRUE,
+                                 ont = "ALL")
 
-  as_tibble(ego2) %>%
-    filter(ID  == "GO:0006754")
+ego2 <- clusterProfiler::enrichGO(gene = glm_de_res %>% filter(lfc < -0.3) %>% slice_min(pval, n = 200) %>% pull(name), 
+                                 universe = glm_de_res$name,
+                                 OrgDb = org.Hs.eg.db::org.Hs.eg.db,
+                                 keyType = "ENSEMBL",
+                                 readable = TRUE,
+                                 ont = "ALL")
+ekegg1 <- clusterProfiler::enrichKEGG(gene = glm_de_res %>% slice_min(pval, n = 200) %>% 
+                                        pull(name) %>% 
+                                        clusterProfiler::bitr(fromType = "ENSEMBL", toType = "ENTREZID", OrgDb = org.Hs.eg.db::org.Hs.eg.db, drop=TRUE) %>% 
+                                        pull(ENTREZID), 
+                                 universe = clusterProfiler::bitr(glm_de_res$name, fromType = "ENSEMBL", toType = "ENTREZID", OrgDb = org.Hs.eg.db::org.Hs.eg.db, drop=TRUE)$ENTREZID,
+                                 organism = "hsa",
+                                 keyType = "kegg")
+
+
+as_tibble(ego1) %>% print(n = 20)
+as_tibble(ego2) %>% print(n = 20)
+as_tibble(ekegg1) %>% print(n = 20)
+
+as_tibble(ego1) %>%
+  filter(ID  == "GO:0034976")
+
+as_tibble(ego2) %>%
+  filter(ID  == "GO:0006754")
 ```
 
 
@@ -655,66 +654,58 @@ sum(fit_small$colData$cell_type == "Tumor") - sum(filter(is_inside2, gene == "HE
 cell_type_legend <- ggplot(enframe(cell_type_colors), aes(x = 0, y = 0, color = name)) + 
   geom_point() + 
   scale_color_manual(values = cell_type_colors, name = "Cell types") +
-  theme(legend.position = "bottom")
+  theme(legend.position = "left", legend.title = element_text(size = font_size))
 
 condition_legend <- ggplot(enframe(condition_colors), aes(x = 0, y = 0, color = name)) + 
   geom_point() + 
   scale_color_manual(values = condition_colors, name = "Conditions") +
-  theme(legend.position = "bottom")
+  theme(legend.position = "left", legend.title = element_text(size = font_size))
 ```
 
 
 
 ```{r}
-row1_umap_width <- 40
-row1_umap_height <- 34
-row1_offset_top <- 12
+row1_umap_width <- 48
 
 plot_assemble(
   add_text("(A) Glioblastoma experimental design", x = 1.5, y = 1.5, vjust = 1, fontsize = font_size, fontface = "bold"),
   add_graphic("../illustrations/glioblastoma_experiment_overview_wideArtboard 1.pdf", x = 1.5,  y = 2.5, units = "mm"),
   
   add_text("(B) Alignment with LEMUR adjusting for patient and treatment effect", x = 1.5, y = 24.5, vjust = 1, fontsize = font_size, fontface = "bold"),
-  add_plot(cowplot::get_legend(condition_legend), x = 5, y = 28 , height = 3),
-  add_text("UMAP of $Y$", x = 0 + row1_umap_width * 0.5, y = 32, vjust = 1, hjust = 0.5, fontsize = 7),
-  add_text("UMAP of $Z$ before alignment", x = 0 + row1_umap_width * 1.5, y = 32, vjust = 1, hjust = 0.5, fontsize = 7),
-  add_text("UMAP of $Z$ after alignment", x = 0 + row1_umap_width * 2.5, y = 32, vjust = 1, hjust = 0.5, fontsize = 7),
-  add_plot(umap_orig_pc_pl, x = 0 + row1_umap_width * 0, y = 33, width = row1_umap_width, height = row1_umap_height),
-  add_plot(umap_fit_pc_pl, x = 0 + row1_umap_width * 1, y = 33, width = row1_umap_width, height = row1_umap_height),
-  add_plot(umap_fital_pc_pl, x = 0 + row1_umap_width * 2, y = 33, width = row1_umap_width, height = row1_umap_height),
+  add_plot(cowplot::get_legend(condition_legend), x = 3, y = 31 , height = 34),
+  add_text("UMAP of $Y$", x = 25 + row1_umap_width * 0.5, y = 30, vjust = 1, hjust = 0.5, fontsize = 7),
+  add_text("UMAP of $Z$ before alignment", x = 25 + row1_umap_width * 1.5, y = 30, vjust = 1, hjust = 0.5, fontsize = 7),
+  add_text("UMAP of $Z$ after alignment", x = 25 + row1_umap_width * 2.5, y = 30, vjust = 1, hjust = 0.5, fontsize = 7),
+  add_plot(umap_orig_pc_pl, x = 25 + row1_umap_width * 0, y = 31, width = row1_umap_width, height = 40),
+  add_plot(umap_fit_pc_pl, x = 25 + row1_umap_width * 1, y = 31, width = row1_umap_width, height = 40),
+  add_plot(umap_fital_pc_pl, x = 25 + row1_umap_width * 2, y = 31, width = row1_umap_width, height = 40),
 
-  add_plot(cowplot::get_legend(cell_type_legend), x = 5, y = 67, height = 3),
-  add_text("UMAP of $Y$", x = 0 + row1_umap_width * 0.5, y = 71, vjust = 1, hjust = 0.5, fontsize = 7),
-  add_text("UMAP of $Z$ before alignment", x = 0 + row1_umap_width * 1.5, y = 71, vjust = 1, hjust = 0.5, fontsize = 7),
-  add_text("UMAP of $Z$ after alignment", x = 0 + row1_umap_width * 2.5, y = 71, vjust = 1, hjust = 0.5, fontsize = 7),
-  add_plot(umap_orig_ct_pl, x = 0 + row1_umap_width * 0, y = 72, width = row1_umap_width, height = row1_umap_height),
-  add_plot(umap_fit_ct_pl, x = 0 + row1_umap_width * 1, y = 72, width = row1_umap_width, height = row1_umap_height),
-  add_plot(umap_fital_ct_pl, x = 0 + row1_umap_width * 2, y = 72, width = row1_umap_width, height = row1_umap_height),
+  add_plot(cowplot::get_legend(cell_type_legend), x = 3, y = 70, height = 40),
+  add_plot(umap_orig_ct_pl, x = 25 + row1_umap_width * 0, y = 70, width = row1_umap_width, height = 40),
+  add_plot(umap_fit_ct_pl, x = 25 + row1_umap_width * 1, y = 70, width = row1_umap_width, height = 40),
+  add_plot(umap_fital_ct_pl, x = 25 + row1_umap_width * 2, y = 70, width = row1_umap_width, height = 40),
 
-  add_text("(C) Cell type assignment", x = row1_umap_width * 3, y = 24.5, vjust = 1, fontsize = font_size, fontface = "bold"),
-  add_plot(cell_type_dot_plot , x = 120, y = 28, width = 50, height = 38),
-  add_text("(D) Multi-condition biplot", x = row1_umap_width * 3, y = 72, vjust = 1, fontsize = font_size, fontface = "bold"),
-  add_plot(mc_biplot, x = row1_umap_width * 3 - 3, y = 75, width = 50, height = 33),
+  add_text("(C) Cell type assignment", x = 1.5, y = 111, vjust = 1, fontsize = font_size, fontface = "bold"),
+  add_plot(cell_type_dot_plot + guides() , x = 0, y = 114, width = 37, height = 37),
+  add_text("(D) Multi-condition biplot", x = 39, y = 111, vjust = 1, fontsize = font_size, fontface = "bold"),
+  add_plot(mc_biplot, x = 37, y = 114, width = 42, height = 40),
    
-  add_text("(E) Cluster-free differential expression. Panobinostat causes", x = 1.5, y = 107, vjust = 1, fontsize = font_size, fontface = "bold"),
-  add_graphic("../illustrations/manual_divergent_colorscaleArtboard 1.pdf", x = 82,  y = 105, units = "mm"),
-  # add_plot(pan_volcano, x = 0, y = 111, width = 36, height = 38),
-  add_plot(de_plots[[1]], x = 0, y = 110, width = 60, height = 36),
-  add_plot(comparison_pl[[1]], x = 60, y = 118, width = 25, height = 28),
-  add_plot(de_plots[[2]], x = 85, y = 110, width = 60, height = 36),
-  add_plot(comparison_pl[[2]], x = 145, y = 118, width = 25, height = 28),
+  add_text("(E) Cluster-free differential expression of HIST3H2A", x = 86.5, y = 111, vjust = 1, fontsize = font_size, fontface = "bold"),
+  add_text("Panobinostat causes", x = 91, y = 116, vjust = 1, fontsize = 7),
+  add_graphic("../illustrations/manual_divergent_colorscaleArtboard 1.pdf", x = 113.5,  y = 113, units = "mm"),
+  add_plot(de_plots[[1]], x = 85, y = 116, width = 60, height = 40),
+  add_plot(comparison_pl[[1]], x = 145, y = 119, width = 25, height = 36),
 
-  add_text("(F) Panobinostat stimulates HERPUD1 up-regulation in a subpopulation of tumor cells", x = 1.5, y = 150, vjust = 1, fontsize = font_size, fontface = "bold"),
-  add_plot(de_plots2, x = 0, y = 154, width = 61, height = 40),
-  add_plot(comparison_pl2, x = 61, y = 154, width = 45, height = 40),
-  add_plot(diff_pl, x = 104, y = 154, width = 25, height = 40),
-
-  add_text("(G) Subpopulation markers\n\\quad\\quad in control condition", x = 130, y = 150, vjust = 1, fontsize = font_size, fontface = "bold"),
+  add_text("(F) Panobinostat stimulates HERPUD1 up-regulation in a subpopulation of tumor cells", x = 1.5, y = 158, vjust = 1, fontsize = font_size, fontface = "bold"),
+  add_plot(de_plots2, x = 0, y = 162, width = 61, height = 40),
+  add_plot(comparison_pl2, x = 61, y = 162, width = 45, height = 40),
+  add_plot(diff_pl, x = 104, y = 162, width = 25, height = 40),
+  add_text("(G) Subpopulation markers\n\\quad\\quad in control condition", x = 130, y = 158, vjust = 1, fontsize = font_size, fontface = "bold"),
   add_plot(cowplot::get_legend(volcano_enrichment_pl + guides(color = guide_legend(override.aes = list(size = 1))) + labs(color = "")),
-           x = 133, y = 156.5, width = 36, height = 4),
-  add_plot(volcano_enrichment_pl + guides(color = "none"), x = 129, y = 160, width = 41, height = 37),
+           x = 133, y = 164.5, width = 36, height = 4),
+  add_plot(volcano_enrichment_pl + guides(color = "none"), x = 129, y = 168, width = 41, height = 37),
   
-  width = 170, height = 197, units = "mm", show_grid_lines = FALSE, latex_support = TRUE,
+  width = 170, height = 205, units = "mm", show_grid_lines = FALSE, latex_support = TRUE,
   filename = "../plots/glioblastoma_results.pdf")
 ```
 
