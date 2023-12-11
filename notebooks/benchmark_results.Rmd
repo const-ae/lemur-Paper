@@ -76,7 +76,7 @@ suppl_int_mix_plt <- perf_data %>%
   mutate(method = factor(method, levels = methods)) %>%
   filter(metric %in% c("mmd", "wasserstein", "mix", "batchSS_over_totalSS")) %>%
   mutate(metric = factor(metric, levels = c("mix", "mmd", "wasserstein", "batchSS_over_totalSS"),
-                         labels = c("kNN Mix", "MMD", "Wasserstein",  "Var. Expl.\nCondition"))) %>%
+                         labels = c("kNN Mix", "$\\log$ MMD", "Wasserstein",  "Var. Expl.\nCondition"))) %>%
   ggplot(aes(x = method, y = value)) +
     geom_point(aes(color = comparison), size = 0.4) +
     ggh4x::facet_grid2(vars(metric), vars(data), scales = "free_y", labeller = labeller(data = as_labeller(dataset_labels)), 
