@@ -1,0 +1,116 @@
+angelidis:
+  assay_continuous: "logcounts"
+  assay_counts: "counts"
+  main_covariate: "age"
+  batch_covariates: []
+  sample_covariate: "mouse_id"
+  contrast: ["24m", "3m"]
+  cell_type_column: "cell_type"
+
+aztekin:
+  assay_continuous: "logcounts"
+  assay_counts: "counts"
+  main_covariate: "DaysPostAmputation"
+  batch_covariates: []
+  sample_covariate: "sample"
+  contrast: [0, 1]
+  cell_type_column: "cluster"
+  
+bunis:
+  assay_continuous: "logcounts"
+  assay_counts: "counts"
+  main_covariate: "age"
+  batch_covariates: []
+  sample_covariate: "Sample"
+  contrast: ["adult", "fetal"]
+  cell_type_column: "labels"
+  
+goldfarbmuren:
+  assay_continuous: "logcounts"
+  assay_counts: "counts"
+  main_covariate: "Smoke_status"
+  batch_covariates: []
+  sample_covariate: "Donor"
+  contrast: ["never", "heavy"]
+  cell_type_column: "cluster_ident"
+
+hrvatin:
+  assay_continuous: "logcounts"
+  assay_counts: "counts"
+  main_covariate: "stim"
+  batch_covariates: []
+  sample_covariate: "sample"
+  contrast: ["4h", "0h"]
+  cell_type_column: "celltype"
+
+jakel:
+  assay_continuous: "logcounts"
+  assay_counts: "counts"
+  main_covariate: "Lesion"
+  batch_covariates: []
+  sample_covariate: "Sample"
+  contrast: ["Ctrl", "NAWM"]
+  cell_type_column: "Celltypes"
+  
+sathyamurthy:
+  assay_continuous: "logcounts"
+  assay_counts: "counts"
+  main_covariate: "condition"
+  batch_covariates: []
+  sample_covariate: "sample"
+  contrast: ["form", "rotarod"]
+  cell_type_column: "cell.type"
+
+kang:
+  assay_continuous: "logcounts"
+  assay_counts: "counts"
+  main_covariate: "label"
+  batch_covariates: []
+  sample_covariate: "replicate"
+  contrast: ["stim", "ctrl"]
+  cell_type_column: "ident"
+
+skinnider:
+  assay_continuous: "logcounts"
+  assay_counts: "counts"
+  main_covariate: "label"
+  batch_covariates: []
+  sample_covariate: "replicate"
+  contrast: ["Paralyzed", "TESS"]
+  cell_type_column: "cell_type"
+
+bhattacherjee:
+  assay_continuous: "logcounts"
+  assay_counts: "counts"
+  main_covariate: "Period"
+  batch_covariates: []
+  sample_covariate: "orig.ident"
+  contrast: ["Maintenance", "withdraw_15d"]
+  cell_type_column: "cell_type"
+  
+canogamez:
+  assay_continuous: "logcounts"
+  assay_counts: "counts"
+  main_covariate: "label"
+  batch_covariates: []
+  sample_covariate: "replicate"
+  contrast: ["Th0", "Th2"]
+  cell_type_column: "cell_type"
+  
+reyfman:
+  assay_continuous: "logcounts"
+  assay_counts: "counts"
+  main_covariate: "label"
+  batch_covariates: []
+  sample_covariate: "donor"
+  contrast: ["Control", "Pulmonary fibrosis"]
+  cell_type_column: "cell_type"
+  
+mouse_gastrulation:
+  assay_continuous: "logcounts"
+  assay_counts: "counts"
+  main_covariate: "type"
+  batch_covariates: []
+  sample_covariate: "sample"
+  contrast: ["wt", "chimera"]
+  cell_type_column: "celltype"
