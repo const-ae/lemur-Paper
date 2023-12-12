@@ -42,8 +42,12 @@ spatial_plaq_dens_pl
 
 
 ```{r}
-umap <- reducedDim(fit, "embeddingUMAP")
+set.seed(1)
+umap <- uwot::umap(t(fit$embedding))
+```
 
+
+```{r}
 as_tibble(colData(fit)) %>%
   mutate(umap = umap) %>%
   ggplot(aes(x = umap[,1], y = umap[,2])) +
@@ -54,6 +58,12 @@ as_tibble(colData(fit)) %>%
   mutate(umap = umap) %>%
   ggplot(aes(x = umap[,1], y = umap[,2])) +
     geom_point(aes(color = cell_type_lumped), size = 0.3, stroke = 0) +
+    guides(color = guide_legend(override.aes = list(size = 1)))
+
+as_tibble(colData(fit)) %>%
+  mutate(umap = umap) %>%
+  ggplot(aes(x = umap[,1], y = umap[,2])) +
+    geom_point(aes(color = plaque_cluster), size = 0.3, stroke = 0) +
     guides(color = guide_legend(override.aes = list(size = 1)))
 ```
 
