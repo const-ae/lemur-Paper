@@ -11,60 +11,11 @@ source("util.R")
 ```
 
 
-# Run on the cluster for memory reasons
 
-```{r}
-sce <- qs::qread("../benchmark/output/cable_spatial_plaque_data/annotated_sce.qs")
-sce
-```
-
-```{r}
-cont2ordered <- function(x, n, from = min(x), to = max(x), add_label = TRUE, label_fmt = "%.2f"){
-  groups <- seq(from, to, length.out = n+1)
-  res <- rep(NA_integer_, length(x))
-  labels <- rep(NA_character_, n)
-  for(idx in seq_len(n)){
-    if(idx == n){
-      labels[idx] <- paste0("[", sprintf(label_fmt, groups[idx]), ",", sprintf(label_fmt, groups[idx+1]), "]")
-      res[x >= groups[idx] & x <= groups[idx+1]] <- idx
-    }else{
-      labels[idx] <- paste0("[", sprintf(label_fmt, groups[idx]), ",", sprintf(label_fmt, groups[idx+1]), ")")
-      res[x >= groups[idx] & x < groups[idx+1]] <- idx
-    }
-  }
-  if(add_label){
-    ordered(res, levels = seq_len(n), labels = labels)
-  }else{
-    res
-  }
-}
-
-cont2ordered(seq(0, 30), n = 6, label_fmt = "%.f")
-levels(cont2ordered(sce$plaque_density, n = 10, label_fmt = "%.2f"))
-```
-
-
-
-```{r}
-sce$plaque_cluster <- cont2ordered(sce$plaque_density, n = 10, label_fmt = "%.2f")
-set.seed(1)
-fit <- lemur::lemur(sce, design = ~ plaque_cluster, n_embedding = 30, test_fraction = 0.6)
-set.seed(1)
-fit <- lemur::align_harmony(fit)
-```
-
-
-```{r}
-fit <- lemur::test_de(fit, cond(plaque_cluster = "[0.90,1.00]") - cond(plaque_cluster = "[0.00,0.10)"))
-set.seed(1)
-nei <- lemur::find_de_neighborhoods(fit, group_by = vars(plaque_cluster, sample), test_method = "edgeR")
-```
-
-# Make pretty plots
 
 ```{r}
 fit <- qs::qread("../benchmark/output/cable_spatial_plaque_data/fit_small.qs")
-nei <- qs::qread("../benchmark/output/cable_spatial_plaque_data/fit_small_nei.qs")
+nei <- qs::qread("../benchmark/output/cable_spatial_plaque_data/nei_small.qs")
 ```
 
 
@@ -104,8 +55,6 @@ as_tibble(colData(fit)) %>%
   ggplot(aes(x = umap[,1], y = umap[,2])) +
     geom_point(aes(color = cell_type_lumped), size = 0.3, stroke = 0) +
     guides(color = guide_legend(override.aes = list(size = 1)))
-
-
 ```
 
 ```{r}

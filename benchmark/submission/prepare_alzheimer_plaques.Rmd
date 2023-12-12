@@ -11,6 +11,11 @@ library(tidyverse)
 ```
 
 
+```{r}
+set.seed(1)
+```
+
+
 Data was downloaded from https://singlecell.broadinstitute.org/single_cell/study/SCP1663
 
 Unfortunately, this cannot be automated, so you will manually need to download the files
@@ -116,14 +121,6 @@ hist(sce$plaque_density)
 ```
 
 
-Cluster plaque density
-```{r}
-clustering <- santoku::chop_evenly(sce$plaque_density, intervals = 5)
-sce$plaque_cluster <- clustering
-colData(sce)
-```
-
-
 ```{r, paged.print=FALSE}
 qc_df <- scuttle::perCellQCMetrics(sce, subsets = list(Mito = str_starts(rowData(sce)$symbol, "mt-")))
 hist(qc_df$subsets_Mito_percent, breaks = 100)
@@ -137,9 +134,47 @@ sce_subset
 
 Calculate UMAP
 ```{r, paged.print=FALSE}
+set.seed(1)
 umap <- scater::calculateUMAP(sce_subset)
 reducedDim(sce_subset, withDimnames = FALSE) <- umap
+```
 
+
+
+
+```{r}
+cont2ordered <- function(x, n, from = min(x), to = max(x), add_label = TRUE, label_fmt = "%.2f"){
+  groups <- seq(from, to, length.out = n+1)
+  res <- rep(NA_integer_, length(x))
+  labels <- rep(NA_character_, n)
+  for(idx in seq_len(n)){
+    if(idx == n){
+      labels[idx] <- paste0("[", sprintf(label_fmt, groups[idx]), ",", sprintf(label_fmt, groups[idx+1]), "]")
+      res[x >= groups[idx] & x <= groups[idx+1]] <- idx
+    }else{
+      labels[idx] <- paste0("[", sprintf(label_fmt, groups[idx]), ",", sprintf(label_fmt, groups[idx+1]), ")")
+      res[x >= groups[idx] & x < groups[idx+1]] <- idx
+    }
+  }
+  if(add_label){
+    ordered(res, levels = seq_len(n), labels = labels)
+  }else{
+    res
+  }
+}
+
+cont2ordered(seq(0, 30), n = 6, label_fmt = "%.f")
+levels(cont2ordered(sce_subset$plaque_density, n = 10, label_fmt = "%.2f"))
+```
+
+
+
+```{r}
+sce_subset$plaque_cluster <- cont2ordered(sce_subset$plaque_density, n = 10, label_fmt = "%.2f")
+```
+
+
+```{r}
 as_tibble(colData(sce_subset)) %>%
   mutate(umap = umap) %>%
   ggplot(aes(x = umap[,1], y = umap[,2])) +
@@ -160,8 +195,38 @@ as_tibble(colData(sce_subset)) %>%
 ```
 
 
+```{r}
+set.seed(1)
+fit <- lemur::lemur(sce_subset, design = ~ plaque_cluster, n_embedding = 30, test_fraction = 0.6)
+set.seed(1)
+fit <- lemur::align_harmony(fit)
+```
+
+
+```{r}
+fit <- lemur::test_de(fit, cond(plaque_cluster = "[0.90,1.00]") - cond(plaque_cluster = "[0.00,0.10)"))
+set.seed(1)
+nei <- lemur::find_de_neighborhoods(fit, group_by = vars(plaque_cluster, sample), test_method = "edgeR")
+```
+
 
 ```{r}
 qs::qsave(sce_subset, "../data/cable_spatial_plaque_data/annotated_sce.qs")
 ```
+
+```{r}
+fit_small <- fit["Jun",]
+nei_small <- nei %>% filter(name == "Jun")
+
+qs::qsave(fit_small, "../output/cable_spatial_plaque_data/fit_small.qs")
+qs::qsave(nei_small, "../output/cable_spatial_plaque_data/nei_small.qs")
+```
+
+
+# Session Info
+
+```{r}
+sessionInfo()
+```
+
 
