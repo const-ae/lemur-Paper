@@ -215,9 +215,6 @@ manual_text_pos <- tribble(
 # eto_proj_df <- as_tibble(eto_proj[top_dirs,] * c(rep(200, 3), 2000), rownames = "gid") %>%
 #   left_join(as_tibble(full_row_data))
 
-pan_tang <- lemur:::sum_tangent_vectors(fit_small$coefficients, c(1, 0, 1, rep(0, times = 5)))[,1:2] * 300
-rownames(pan_tang) <- full_row_data$gid
-
 
 mc_biplot <- as_tibble(colData(fit_small)) %>%
   mutate(emb = t(fit_small$embedding[1:2,])) %>%
