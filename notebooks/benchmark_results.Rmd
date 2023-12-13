@@ -518,6 +518,7 @@ fdr_control_plot
 ```{r}
 power_plot <- de_power_fdr %>%
   filter(de_framework == "edgeR" & is.na(extra_settings)) %>%
+  mutate(data = dataset_labels[data]) %>%
   mutate(data_vals = glue::glue("{data}\n{vals}")) %>%
   mutate(is_lemur = method == "lemur") %>%
   ggplot(aes(x = nominal_fdr, y = TPR)) +
@@ -530,8 +531,8 @@ power_plot <- de_power_fdr %>%
     scale_y_continuous(expand = expansion(0)) +
     labs(title = "(J) DE-test Power", 
          x = "Nominal FDR", y = "True positive rate (TPR)",
-         subtitle = "Comparison of \\textcolor{red}{lemur} against four other \\textcolor{gray!90}{DE. methods}") +
-    theme(plot.title.position = "plot")
+         subtitle = "Comparison of \\textcolor{red}{LEMUR} against four other \\textcolor{gray!90}{DE. methods}") +
+    theme(plot.title.position = "plot", strip.text = element_text(margin = margin(b = unit(-1, "cm"))))
 
 power_plot
 ```
@@ -546,20 +547,21 @@ de_power_fdr_with_label <- de_power_fdr %>%
     str_starts(es, "testfrac_") ~ glue("$\\text{{test fraction}} = {as.numeric(str_remove(es, 'testfrac_')) * 100}\\%$"),
     es == "sel_contrast" ~ "contrast selection",
     es == "dir_contrast" ~ "contrast directions",
-    es == "skip_al" ~ "skip alignment",
+    es == "skip_al" ~ "Rigid LEMUR",
     es == "skip_multCondPCA" ~ "parametric harmony",
     es == "sf_method_ratio" ~ "ratio size factor estimation",
     TRUE ~ es
   )) %>%
+  mutate(method = factor(method, levels = c("global", "celltype", "cluster", "miloDE", "lemur"),
+                         labels = c("Global", "Cell type", "Cluster", "miloDE", "LEMUR"))) %>%
   mutate(method_label = case_when(
     is.na(extra_settings) ~ glue("{method} ({de_framework})"),
     !is.na(extra_settings) ~ glue("{method} ({de_framework})\nwith {extra_settings_pretty}")
   )) %>%
-  mutate(method = factor(method, levels = c("global", "celltype", "cluster", "miloDE", "lemur"))) %>%
   mutate(data_vals = glue::glue("{data}\n{vals}"))
   
 fdr_control_plots <- de_power_fdr_with_label %>%
-  group_by(method == "lemur") %>%
+  group_by(method == "LEMUR") %>%
   group_map(\(data, key){
     ggplot(data, aes(x = nominal_fdr, y = FDR, group = paste0(data, vals, method_label))) +
       geom_line(color = "lightgrey", linewidth = 1) +
@@ -598,7 +600,7 @@ all_methods_power
 plot_assemble(
   add_text("(A) FDR control for all methods", x = 2.7, y = 2, fontsize = font_size, vjust = 1, fontface = "bold"),
   add_plot(cowplot::plot_grid(plotlist = fdr_control_plots, ncol = 1, rel_heights = c(1,2)), x = 0, y = 5, width = 170, height = 120),
-  add_text("(B) Average power for all methods at $\\text{FDR} = 10\\%$", x = 2.7, y = 125, fontsize = font_size, vjust = 1, fontface = "bold"),
+  add_text("(B) Average power for all methods at $\\textrm{FDR} = 10\\%$", x = 2.7, y = 125, fontsize = font_size, vjust = 1, fontface = "bold"),
   add_plot(all_methods_power, x = 0, y = 130, width = 130, height = 80),
 
   width = 170, height = 210, units = "mm", show_grid_lines = FALSE,
@@ -644,12 +646,14 @@ power_per_desize_plot <- power_per_desize %>%
 power_per_desize_plot
 ```
 
+## Variance Explained
 
 ```{r, paged.print=FALSE}
 var_expl <- read_tsv("../benchmark/output/variance_explained.tsv.gz")
 
 var_expl_overall_pl <- var_expl %>%
   filter(subset == "all") %>%
+  mutate(method = factor(method, levels = c("lemur", "pca"), labels = c("LEMUR", "PCA"))) %>%
   mutate(is_row_subset = n_genes == 500) %>%
   ggplot(aes(x = dimensions, y = var_expl * 100)) +
     geom_hline(yintercept = 0, linewidth = 0.3) +
@@ -665,20 +669,10 @@ var_expl_overall_pl <- var_expl %>%
           panel.grid.major.y = element_line("lightgrey", linewidth = 0.2),
           panel.spacing.y = unit(5, "mm"), panel.spacing.x = unit(3, "mm"))
 
-# var_expl_cond_pl <- var_expl %>%
-#   filter(subset != "all") %>%
-#   mutate(subset = as.integer(as.factor(subset)), .by = c(dataset)) %>%
-#   mutate(is_row_subset = n_genes == 500) %>%
-#   ggplot(aes(x = dimensions, y = var_expl * 100)) +
-#     geom_line(aes(color = method, linetype = method, group = interaction(method, subset))) +
-#     facet_grid(vars(is_row_subset), vars(dataset), 
-#                labeller = ggplot2::labeller(is_row_subset = as_labeller(c("TRUE" = "500 HVG", "FALSE" = "All Genes")), dataset = as_labeller(dataset_labels))) +
-#     labs(y = "Percent variance explained", x = "Latent dimensions",
-#          title = "(B) Variance explained per condition")
-
 var_duration_pl1 <- var_expl %>%
   filter(subset == "all") %>%
   filter(dimensions > 0) %>%
+  mutate(method = factor(method, levels = c("lemur", "pca"), labels = c("LEMUR", "PCA"))) %>%
   mutate(is_row_subset = n_genes == 500) %>%
   mutate(original_n_genes = max(n_genes), .by = dataset) %>%
   mutate(dataset = fct_reorder(dataset, n_cells)) %>%
