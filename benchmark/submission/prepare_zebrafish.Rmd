@@ -1,0 +1,109 @@
+---
+title: "R Notebook"
+---
+
+```{r}
+library(tidyverse)
+library(glue)
+library(SingleCellExperiment)
+```
+
+```{r}
+neural_genes <- c("iqsec1b", "nrxn2a")
+neural_gene_ids <- c("ENSDARG00000016551", "ENSDARG00000061454")
+periderm_genes <- c("krt18a.1", "krt8","slc6a9")
+periderm_gene_ids <- c("ENSDARG00000058358", "ENSDARG00000018404", "ENSDARG00000018534")
+```
+
+
+```{r}
+if(!file.exists("../data/saunders_zebrafish_data/GSE202639_reference_cell_metadata.csv.gz")){
+  if(! dir.exists("../data/saunders_zebrafish_data/")) dir.create("../data/saunders_zebrafish_data/")
+  download.file("https://ftp.ncbi.nlm.nih.gov/geo/series/GSE202nnn/GSE202639/suppl/GSE202639%5Freference%5Fcell%5Fmetadata.csv.gz", "../data/saunders_zebrafish_data/GSE202639_reference_cell_metadata.csv.gz")
+}
+if(!file.exists("../data/saunders_zebrafish_data/GSE202639_reference_cds.RDS")){
+  if(! dir.exists("../data/saunders_zebrafish_data/")) dir.create("../data/saunders_zebrafish_data/")
+  # Download for max. 10 minutes
+  options(timeout=600)
+  download.file("https://ftp.ncbi.nlm.nih.gov/geo/series/GSE202nnn/GSE202639/suppl/GSE202639%5Freference%5Fcds.RDS.gz", "../data/saunders_zebrafish_data/GSE202639_reference_cds.RDS")
+}
+```
+
+
+```{r}
+library(monocle3)
+meta <- read_csv("~/huber/data/saunders_zebrafish_data/published/GSE202639_reference_cell_metadata.csv.gz")
+data <- readRDS("~/huber/data/saunders_zebrafish_data/published/GSE202639_reference_cds.RDS")
+data
+```
+
+
+```{r}
+set.seed(1)
+hvg <- order(-rowVars(counts(data)))
+sce_subset <- data[hvg[1:2000],]
+sce_subset <- sce_subset[,sce_subset$gene_target %in% c("ctrl-inj", "ctrl-uninj")]
+sce_subset <- sce_subset[,! is.na(sce_subset$timepoint)]
+sce_subset <- sce_subset[, sce_subset$timepoint >= 18 & sce_subset$timepoint <= 48]
+logcounts(sce_subset) <- transformGamPoi::shifted_log_transform(sce_subset)
+
+system.time({
+  fit <- lemur::lemur(sce_subset, design = ~ splines::ns(timepoint, df = 3), n_emb = 80)
+})
+reducedDim(fit, "initial_embedding") <- t(fit$embedding)
+system.time({
+  fit <- lemur::align_harmony(fit)
+})
+
+system.time({
+  fit <- lemur::test_de(fit, cond(timepoint = 48) - cond(timepoint = 24))
+})
+system.time({
+  nei <- lemur::find_de_neighborhoods(fit, group_by = vars(embryo, timepoint), test_method = "edgeR")
+})
+
+set.seed(1)
+reducedDim(fit, "umap_embedding", withDimnames = FALSE) <- uwot::umap(t(fit$embedding))
+reducedDim(fit, "umap_initial_embedding", withDimnames = FALSE) <- uwot::umap(reducedDim(fit, "initial_embedding"))
+reducedDim(fit, "umap_original", withDimnames = FALSE) <- scater::calculateUMAP(fit)
+
+
+qs::qsave(fit, "../tmp/saunders_zebrafish-fit_hvg2k_subset_spline.qs")
+qs::qsave(nei, "../tmp/saunders_zebrafish-fit_hvg2k_subsets_spline_nei.qs")
+```
+
+
+
+```{r}
+sel_genes <- c(neural_genes, periderm_genes)
+fit_subset <- fit[fit$rowData$id[fit$rowData$gene_short_name %in% sel_genes],]
+reducedDim(fit_subset, "PCA") <- NULL
+reducedDim(fit_subset, "initial_embedding") <- NULL
+reducedDim(fit_subset, "Aligned") <- NULL
+colData(fit_subset)[,c("Size_Factor", "Oligo", "umap3d_1", "umap3d_2", "umap3d_3", "temp")] <- NULL
+
+qs::qsave(fit_subset, "../output/zebrafish/saunders_zebrafish-fit_5_genes.qs")
+umap_model <- uwot::umap(t(fit$embedding), ret_model = TRUE)
+
+emb <- fit_subset$embedding
+
+start_cell1 <- "F08_B03_P04-C07_LIG124"
+end_cell1 <- "G11_G02_P04-G08_LIG122"
+interpolation1 <- t(lemur:::mply_dbl(seq(0, 1, l = 100), \(f){
+  emb[,start_cell1] + f * (emb[,end_cell1] - emb[,start_cell1])
+}, ncol = nrow(emb)))
+
+start_cell2 <- "H04_H03_P03-C11_LIG190"
+end_cell2 <- "G04_H11_P03-E03_LIG290"
+interpolation2 <- t(lemur:::mply_dbl(seq(0, 1, l = 100), \(f){
+  emb[,start_cell2] + f * (emb[,end_cell2] - emb[,start_cell2])
+}, ncol = nrow(emb)))
+
+umap_inter1 <- uwot::umap_transform(t(interpolation1), umap_model)
+umap_inter2 <- uwot::umap_transform(t(interpolation2), umap_model)
+
+qs::qsave(list(umap_all = umap_model$embedding, umap_inter1 = umap_inter1, umap_inter2 = umap_inter2),
+          "../output/zebrafish/saunders_zebrafish-umap_embeddings.qs")
+```
+
+
