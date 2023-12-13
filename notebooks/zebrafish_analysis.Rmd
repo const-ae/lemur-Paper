@@ -80,6 +80,7 @@ umap_pl
 
 
 ```{r}
+set.seed(1)
 obs_gene_expr <- bind_rows(map(levels(timepoint_brackets), \(brack){
   fit_br <- fit_subset[,timepoint_brackets == brack]
   knn_index <- BiocNeighbors::buildAnnoy(t(fit_br$embedding))
@@ -113,15 +114,15 @@ obs_expr_df <- obs_gene_expr %>%
 pred_plot <- pred_expr_df %>%
   ggplot(aes(x = timepoint, y = pred)) +
     geom_line(aes(color = origin, group = as.factor(origin))) +
-    stat_summary(data = obs_expr_df, geom = "point", aes(y = expr, fill = origin, group = interaction(timepoint_br, origin)), 
-                 fun.data = mean_se, shape = 21, color = "black", size = 2) +
-    geom_text(data = tibble(label = "Average of cells near the green\nposition for timepoints 18h-24h.", gene_short_name = "iqsec1b"),
+    geom_point(data = obs_expr_df %>% summarize(timepoint = median(timepoint), expr = mean(expr), .by = c(gene_short_name, timepoint_br, origin)),
+               aes(y = expr, fill = origin), shape = 21, color = "black", size = 2) +
+    geom_text(data = tibble(label = "Average of cells near the blue\nposition for timepoints 18h-24h.", gene_short_name = "iqsec1b"),
               aes(label = label), x = 18, y = 2.5, hjust = 0, vjust = 0.5, size = font_size_tiny / .pt) +
-    geom_segment(data = tibble(x = 24, y = 2.0, xend = 21, yend = 0.9, gene_short_name = "iqsec1b"),
+    geom_segment(data = tibble(x = 24, y = 2.0, xend = 21, yend = 0.983, gene_short_name = "iqsec1b"),
                  aes(x = x, y = y, xend = xend, yend = yend)) +
-    geom_text(data = tibble(label = "LEMUR's prediction for\nthe green position at 35h", gene_short_name = "iqsec1b"),
+    geom_text(data = tibble(label = "LEMUR's prediction for\nthe blue position at 35h", gene_short_name = "iqsec1b"),
               aes(label = label), x = 36.5, y = 2, hjust = 0, vjust = 0.5, size = font_size_tiny / .pt) +
-    geom_segment(data = tibble(x = 36, y = 1.5, xend = 35, yend = 1.02, gene_short_name = "iqsec1b"),
+    geom_segment(data = tibble(x = 36, y = 1.5, xend = 35, yend = 0.758, gene_short_name = "iqsec1b"),
                  aes(x = x, y = y, xend = xend, yend = yend)) +
     facet_wrap(vars(gene_short_name), scales = "fixed") +
     scale_y_continuous(expand = expansion(mult = c(0, 0.1)), limits = c(0, 3)) +
@@ -138,7 +139,7 @@ pred_plot
 
 
 ```{r, paged.print=FALSE}
-
+set.seed(1)
 obs_gene_expr2 <- bind_rows(map(levels(timepoint_brackets), \(brack){
   fit_br <- fit_subset[,timepoint_brackets == brack]
   knn_index <- BiocNeighbors::buildAnnoy(t(fit_br$embedding))
@@ -174,8 +175,10 @@ pred_plot2 <- pred_expr_df2 %>%
   filter(gene_short_name %in% periderm_genes[c(2,3)]) %>%
   ggplot(aes(x = timepoint, y = pred)) +
     geom_line(aes(color = origin, group = as.factor(origin))) +
-    stat_summary(data = obs_expr_df2, geom = "point", aes(y = expr, fill = origin, group = interaction(timepoint_br, origin)), 
-                 fun.data = mean_se, shape = 21, color = "black", size = 2) +
+    # stat_summary(data = obs_expr_df2, geom = "point", aes(y = expr, fill = origin, group = interaction(timepoint_br, origin)), 
+    #              fun.data = mean_se, shape = 21, color = "black", size = 2) +
+    geom_point(data = obs_expr_df2 %>% summarize(timepoint = median(timepoint), expr = mean(expr), .by = c(gene_short_name, timepoint_br, origin)),
+               aes(y = expr, fill = origin), shape = 21, color = "black", size = 2) +
     facet_wrap(vars(gene_short_name), scales = "fixed") +
     scale_x_continuous(breaks = c(18, 24, 30, 36, 42, 48)) +
     scale_y_continuous(expand = expansion(mult = c(0, 0.1)), limits = c(0, 3)) +
