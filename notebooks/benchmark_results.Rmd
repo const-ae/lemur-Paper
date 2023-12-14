@@ -652,7 +652,9 @@ power_per_desize_plot
 var_expl <- read_tsv("../benchmark/output/variance_explained.tsv.gz")
 
 var_expl_overall_pl <- var_expl %>%
+  bind_rows(var_expl %>% distinct(method, subset, dataset, n_genes, n_cells) %>% mutate(dimensions = 0, var_expl = 0)) %>%
   filter(subset == "all") %>%
+  filter(! is.na(var_expl)) %>%
   mutate(method = factor(method, levels = c("lemur", "pca"), labels = c("LEMUR", "PCA"))) %>%
   mutate(is_row_subset = n_genes == 500) %>%
   ggplot(aes(x = dimensions, y = var_expl * 100)) +
@@ -669,10 +671,11 @@ var_expl_overall_pl <- var_expl %>%
           panel.grid.major.y = element_line("lightgrey", linewidth = 0.2),
           panel.spacing.y = unit(5, "mm"), panel.spacing.x = unit(3, "mm"))
 
-var_duration_pl1 <- var_expl %>%
-  filter(subset == "all") %>%
+var_duration_pl1 <- 0
+var_expl %>%
+  filter(subset == "all" | is.na(subset)) %>%
   filter(dimensions > 0) %>%
-  mutate(method = factor(method, levels = c("lemur", "pca"), labels = c("LEMUR", "PCA"))) %>%
+  # mutate(method = factor(method, levels = c("lemur", "pca"), labels = c("LEMUR", "PCA"))) %>%
   mutate(is_row_subset = n_genes == 500) %>%
   mutate(original_n_genes = max(n_genes), .by = dataset) %>%
   mutate(dataset = fct_reorder(dataset, n_cells)) %>%
@@ -694,7 +697,7 @@ var_duration_pl1 <- var_expl %>%
                                               original_n_genes = as_labeller(\(x) glue("\\tiny{{$G={scales::comma_format()(as.numeric(x))}$}}"))),
                  strip = ggh4x::strip_vanilla(clip = "off"), scales = "free_y") +
       scale_x_continuous(breaks = c(0, 100, 200)) +
-      scale_y_continuous(expand = expansion(mult = c(0, 0.1))) +
+      scale_y_log10(expand = expansion(mult = c(0, 0.1)), limits = c(1, NA)) +
       coord_cartesian(ylim = c(0, if(is_subset) 60 else 20)) +
       labs(y = if(is_subset) "Elapsed time [sec.]" else "Elapsed time [min.]",
            x = "Latent dimensions", color = "", linetype = "",

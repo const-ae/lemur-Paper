@@ -68,9 +68,10 @@ make_prediction_jobs <- function(dataset, variation = "small"){
 }
 
 make_variance_explained_jobs <- function(dataset, variation = "small"){
-  mem <- if(dataset %in% c("reyfman","mouse_gastrulation", "hrvatin", "goldfarbmuren"))  "160GB" else "40GB"
+  mem <- if(dataset %in% c("reyfman","mouse_gastrulation", "hrvatin", "goldfarbmuren"))  "250GB" else "40GB"
   job <- prepare_data(list(dataset = dataset,  variation = variation), memory = mem) 
-  pca_dims <- c(0, 1, 2, 3, 5, 7, 10, 15, 20, 30, 40, 50, 75, 100, 150, 200)
+  pca_dims <- c(1, 2, 3, 5, 7, 10, 15, 20, 30, 40, 50, 75, 100, 150, 200)
+  if(variation == "random_holdout" && dataset %in% c("mouse_gastrulation", "hrvatin")) pca_dims <- c(1, 2, 3, 5, 7, 10, 15, 20, 30, 40, 50, 75, 100)
   calc_variance_explained(params = list(data_id = job$result_id, dataset_config = dataset, pca_dims = pca_dims),
                           dep_jobs = list(job), memory = mem)
 }

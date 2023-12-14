@@ -30,9 +30,10 @@ out_file <- file.path(pa$working_dir, "results/", pa$result_id)
 
 sce <- zellkonverter::readH5AD(file.path(pa$working_dir, "results", pa$data_id, "train.h5ad"))
 
-mat <- as.matrix(assay(sce, config$assay_continuous))
+mat <- assay(sce, config$assay_continuous)
 message("Total RSS: ", sprintf("%.3g", sum(mat^2)))
-mat <- t(lm.fit(model.matrix(as.formula(paste0("~ ", config$main_covariate)), data = colData(sce)), t(mat))$residuals)
+resid <- ResidualMatrix::ResidualMatrix(t(mat), design = model.matrix(as.formula(paste0("~ ", config$main_covariate)), data = colData(sce)))
+mat <- t(as.matrix(resid))
 message("Total RSS (centered): ", sprintf("%.3g", sum(mat^2)))
 
 var_explained <- function(Y, obj, FUN, subset = NULL, ...){
@@ -50,6 +51,16 @@ predict_lemur <- function(fit, subset = NULL){
     predict(fit[,subset])
   }
 }
+predict_pca <- function(fit, subset = NULL){
+  if(is.null(subset)){
+    fit$rotation %*% t(fit$x)
+  }else{
+    fit$rotation %*% t(fit$x[subset,,drop=FALSE])
+  }
+}
+
+pred_func <- list(pca = predict_pca, lemur = predict_lemur)
+
 subsets <- c(list(NULL), lapply(config$contrast, \(lvl) colData(sce)[[config$main_covariate]] == lvl))
 names(subsets) <- c("all", config$contrast)
 
@@ -57,25 +68,42 @@ dataset_overview <- tibble(dataset = pa$dataset_config, n_genes = nrow(mat), n_c
 
 res <- bind_rows(lapply(pa$pca_dims, \(dim){
   message("Starting: ", dim)
+  
   pca_time <- system.time({
-    pca_fit <- lemur::lemur(mat, design = ~ 1, n_embedding = dim, test_fraction = 0, linear_coefficient_estimator = "zero", verbose = FALSE)
+    pca_fit <- irlba::prcomp_irlba(t(mat), n = dim, center = FALSE, scale = FALSE)
   })
+  
   lemur_time <- system.time({
     lemur_fit <- lemur::lemur(mat, design = as.formula(paste0("~ ", config$main_covariate)), col_data = colData(sce),
                  n_embedding = dim, test_fraction = 0, linear_coefficient_estimator = "zero", verbose = FALSE)
   })
+  lemur_al_landmark_time <- system.time({
+    lemur_fit_al1 <- lemur::align_by_grouping(lemur_fit, grouping = colData(sce)[[config$cell_type_column]])
+  })
+  lemur_al_harmony_time <- tryCatch({
+    system.time({
+      lemur_fit_al2 <- lemur::align_harmony(lemur_fit)
+    })
+    },
+    error = function(err){
+      lemur_al_landmark_time * NA
+    })
+  
   models <- list(pca = pca_fit, lemur = lemur_fit)
   
-  timing_df <- bind_rows(as.list(pca_time), as.list(lemur_time)) %>%
-    mutate(method = c("pca", "lemur"))
+  timing_df <- bind_rows(as.list(pca_time), as.list(lemur_time), 
+                         as.list(lemur_time + lemur_al_landmark_time), 
+                         as.list(lemur_time + lemur_al_harmony_time)) %>%
+    mutate(method = c("pca", "lemur", "lemur_landmark", "lemur_harmony"),
+           dimensions = dim)
   
   tidyr::expand_grid(dimensions = dim, 
                      method = c("pca", "lemur"),
                      subset = c("all", config$contrast)) %>%
     mutate(var_expl = map2_dbl(method, subset, \(m, s){
-      var_explained(mat, models[[m]], predict_lemur, subset = subsets[[s]])
+      var_explained(mat, models[[m]], pred_func[[m]], subset = subsets[[s]])
     }))  %>%
-    left_join(timing_df, by = "method") %>%
+    full_join(timing_df, by = c("method", "dimensions")) %>%
     bind_cols(dataset_overview)
 }))
 
