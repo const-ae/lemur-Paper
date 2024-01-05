@@ -34,8 +34,8 @@ time_course_pl <- as_tibble(colData(fit_subset)) %>%
   mutate(timepoint_brackets = timepoint_brackets) %>%
   mutate(umap = umaps$umap_all) %>%
   ggplot(aes(x = umap[,1], y = umap[,2])) +
-    ggrastr::rasterize(geom_point(data = tibble(umap = umaps$umap_all), size = 0.01, stroke = 0, color = "grey95"), dpi = 300) +
-    ggrastr::rasterize(geom_point(size = 0.01, stroke = 0, color = "black"), dpi = 600) +
+    ggrastr::rasterize(geom_point(data = tibble(umap = umaps$umap_all), size = 0.1, stroke = 0, color = "grey85"), dpi = 300) +
+    ggrastr::rasterize(geom_point(size = 0.01, stroke = 0, color = "black", alpha = 0.3), dpi = 600) +
     facet_wrap(vars(timepoint_brackets), nrow = 1) +
     small_axis()
   
@@ -67,7 +67,7 @@ sel_pos <- seq(1, nrow(umaps$umap_inter1), l = n_pos)
 umap_pl <- as_tibble(colData(fit_subset)) %>%
   mutate(umap = umaps$umap_all) %>%
   ggplot(aes(x = umap[,1], y = umap[,2])) +
-    ggrastr::rasterize(geom_point(size = 0.01, stroke = 0), dpi = 600) +
+    ggrastr::rasterize(geom_point(size = 0.1, stroke = 0, color = "grey85"), dpi = 600) +
     geom_point(data = tibble(umap = umaps$umap_inter1[sel_pos,], position = seq(0, 1, l = n_pos)), aes(color = position), size = 0.6) +
     colorspace::scale_color_continuous_divergingx(palette = "Zissou1", mid = 0.5) +
     ggnewscale::new_scale_color() +
@@ -109,7 +109,7 @@ obs_expr_df <- obs_gene_expr %>%
   pivot_longer(starts_with("ENSDAR"), names_to = "gene_id", values_to = "expr") %>%
   mutate(timepoint_br = factor(timepoint_br, levels = levels(timepoint_brackets))) %>%
   left_join(as_tibble(rowData(fit_subset)), by = c("gene_id" = "id")) %>% 
-  mutate(timepoint = str_extract_all(timepoint_br, "\\d+\\.?\\d*") %>% map_dbl(\(x) mean(as.numeric(x)))) 
+  mutate(timepoint = str_extract_all(timepoint_br, "\\d+\\.?\\d*") %>% map_dbl(\(x) mean(as.numeric(x))))
 
 pred_plot <- pred_expr_df %>%
   ggplot(aes(x = timepoint, y = pred)) +
@@ -124,7 +124,7 @@ pred_plot <- pred_expr_df %>%
               aes(label = label), x = 36.5, y = 2, hjust = 0, vjust = 0.5, size = font_size_tiny / .pt) +
     geom_segment(data = tibble(x = 36, y = 1.5, xend = 35, yend = 0.758, gene_short_name = "iqsec1b"),
                  aes(x = x, y = y, xend = xend, yend = yend)) +
-    facet_wrap(vars(gene_short_name), scales = "fixed") +
+    facet_wrap(vars(gene_short_name), scales = "fixed", labeller = as_labeller(\(x)glue("\\emph{{{x}}}"))) +
     scale_y_continuous(expand = expansion(mult = c(0, 0.1)), limits = c(0, 3)) +
     scale_x_continuous(breaks = c(18, 24, 30, 36, 42, 48)) +
     # coord_cartesian(clip = "off") +
@@ -169,19 +169,17 @@ obs_expr_df2 <- obs_gene_expr2 %>%
   mutate(timepoint_br = factor(timepoint_br, levels = levels(timepoint_brackets))) %>%
   left_join(as_tibble(rowData(fit_subset)), by = c("gene_id" = "id")) %>% 
   mutate(timepoint = str_extract_all(timepoint_br, "\\d+\\.?\\d*") %>% map_dbl(\(x) mean(as.numeric(x)))) %>%
-  filter(gene_short_name %in% periderm_genes[c(2,3)]) 
+  filter(gene_short_name %in% periderm_genes[c(2,3)])
 
 pred_plot2 <- pred_expr_df2 %>%
   filter(gene_short_name %in% periderm_genes[c(2,3)]) %>%
   ggplot(aes(x = timepoint, y = pred)) +
     geom_line(aes(color = origin, group = as.factor(origin))) +
-    # stat_summary(data = obs_expr_df2, geom = "point", aes(y = expr, fill = origin, group = interaction(timepoint_br, origin)), 
-    #              fun.data = mean_se, shape = 21, color = "black", size = 2) +
     geom_point(data = obs_expr_df2 %>% summarize(timepoint = median(timepoint), expr = mean(expr), .by = c(gene_short_name, timepoint_br, origin)),
                aes(y = expr, fill = origin), shape = 21, color = "black", size = 2) +
-    facet_wrap(vars(gene_short_name), scales = "fixed") +
+    facet_wrap(vars(gene_short_name), scales = "fixed", labeller = as_labeller(\(x)glue("\\emph{{{x}}}"))) +
     scale_x_continuous(breaks = c(18, 24, 30, 36, 42, 48)) +
-    scale_y_continuous(expand = expansion(mult = c(0, 0.1)), limits = c(0, 3)) +
+    scale_y_continuous(expand = expansion(mult = c(0, 0)), limits = c(0, 2.2)) +
     colorspace::scale_fill_continuous_divergingx(palette = "Tropic", mid = 0.5) +
     colorspace::scale_color_continuous_divergingx(palette = "Tropic", mid = 0.5) +
     guides(fill = "none") +
@@ -194,11 +192,11 @@ pred_plot2
 
 ```{r}
 plot_assemble(
-  add_text("(A) Zebrafish embryo time course (hours post fertilization)", x = 2.7, y = 1, fontsize = font_size, vjust = 1, fontface = "bold"),
+  add_text("(A) Zebrafish embryo development time course (hours post fertilization)", x = 2.7, y = 1, fontsize = font_size, vjust = 1, fontface = "bold"),
   add_plot(time_course_pl, x = 0, y = 3, width = 170, height = 50),
-  add_text("(B) Selected positions", x = 2.7, y = 53, fontsize = font_size, vjust = 1, fontface = "bold"),
+  add_text("(B) Synthetic cells projected on UMAP", x = 2.7, y = 53, fontsize = font_size, vjust = 1, fontface = "bold"),
   add_plot(umap_pl + theme(legend.position = "none"), x = 0, y = 56, width = 60, height = 57),
-  add_text("(C) Predicted interactions between time and continuously varying positions",
+  add_text("(C) Predicted interactions between time and coordinates in latent space",
            x = 62.7, y = 53, fontsize = font_size, vjust = 1, fontface = "bold"),
   add_plot(pred_plot + theme(legend.position = "none"), x = 60, y = 58, width = 110, height = 28.5),
   add_plot(pred_plot2  + theme(legend.position = "none"), x = 60, y = 58+28.5, width = 110, height = 28.5),

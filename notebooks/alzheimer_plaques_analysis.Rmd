@@ -32,10 +32,11 @@ spatial_plaq_dens_pl <- as_tibble(colData(fit)) %>%
     ggrastr::rasterize(geom_point(aes(color = plaque_density), size = 0.05, stroke = 0), dpi = 600) +
     scale_color_gradient(low = "lightgrey", high = "darkorange", limits = c(0, 1), breaks = c(0, 0.5, 1)) +
     facet_wrap(vars(sample), labeller = as_labeller(mouse_labels)) +
-    small_axis(label = "spatial\ncoordinates") +
-    labs(color = "Plaque density") +
+    small_axis(label = "spatial coord.", fontsize = font_size_small) +
+    labs(color = "Plaque density", subtitle = "Spatial structure") +
     guides(color = guide_colorbar(barheight = unit(1, "mm"))) +
-    theme(legend.position = "top")
+    theme(legend.position = "top", strip.text = element_text(size = font_size_tiny, margin = margin(b = -1, unit = "mm")),
+          plot.subtitle = element_text(size = 7))
 
 spatial_plaq_dens_pl
 ```
@@ -71,9 +72,11 @@ as_tibble(colData(fit)) %>%
 umap_plt <- as_tibble(colData(fit)) %>%
   mutate(umap = umap) %>%
   ggplot(aes(x = umap[,2], y = umap[,1])) +
-    ggrastr::rasterize(geom_point(aes(color = plaque_density), size = 0.05, stroke = 0, show.legend = FALSE), dpi = 600) +
+    ggrastr::rasterize(geom_point(aes(color = plaque_density), size = 0.1, stroke = 0, show.legend = FALSE), dpi = 600) +
     scale_color_gradient(low = "lightgrey", high = "darkorange", limits = c(0, 1), breaks = c(0, 0.5, 1))  +
-    small_axis(label = "UMAP")
+    small_axis(label = "UMAP", fontsize = font_size_small) +
+    labs(subtitle = "Latent structure") +
+    theme(plot.subtitle = element_text(size = 7))
 
 umap_plt
 ```
@@ -114,7 +117,9 @@ expr_comparison_pl <- comparison_data %>%
     scale_y_continuous(limits = c(0, 0.3), expand = expansion(add = 0)) +
     guides(x = guide_axis(angle = 45)) +
     theme(axis.title.x = element_blank(), legend.position = "bottom") +
-    labs(color = "", y = "Expression")
+    labs(color = "", y = "Expression",
+         subtitle = "\\emph{Jun} expr. vs. plaque density")  +
+    theme(plot.subtitle = element_text(size = 7))
 
 expr_comparison_pl
 ```
@@ -150,7 +155,7 @@ jun_de_pl <- de_plot_data %>%
     scale_colour_gradient2_rev(limits = c(-1, 1), oob = scales::squish, breaks = c(-1, 0, 1), na.value = "#00000000") +
     facet_grid(vars(inside), labeller = labeller(inside = as_labeller(c("in" = "Inside Neighborhood", "out" = "Outside Neighborhood"))),
                switch="y") +
-    small_axis("UMAP") 
+    small_axis("UMAP", fontsize = font_size_small) 
 
 jun_de_pl
 ```
@@ -184,11 +189,13 @@ rel_plt
 plot_assemble(
   add_text("(D) Alzheimer plaque density", x = 2.7, y = 1, fontsize = font_size, vjust = 1, fontface = "bold"),
   add_plot(cowplot::get_legend(spatial_plaq_dens_pl + theme(legend.text = element_text(size = font_size)) + labs(color = "")), x = 43, y = 1, height = 5),
-  add_plot(spatial_plaq_dens_pl + guides(color = "none"), x = 0, y = 3, width = 60, height = 63),
-  add_plot(umap_plt, x = 52, y = 3, width = 40, height = 63),
+  add_plot(spatial_plaq_dens_pl + guides(color = "none"), x = 0, y = 5, width = 60, height = 61),
+  add_plot(umap_plt, x = 52, y = 5, width = 40, height = 61),
   add_text("(E) Expression of \\emph{Jun} depends on the plaque density",
            x = 95, y = 1, fontsize = font_size, vjust = 1, fontface = "bold"),
-  add_plot(jun_de_pl, x = 95, y = 3, width = 25, height = 63),
+  add_text("Pred.~\\emph{Jun} diff.~expr.",
+           x = 97.5, y = 6.5, fontsize = 7, vjust = 1, fontface = "plain"),
+  add_plot(jun_de_pl, x = 95, y = 4.5, width = 25, height = 61.5),
   add_plot(expr_comparison_pl + guides(color = "none") + theme(axis.text.x = element_blank()), x = 120, y = 5, width = 50, height = 30),
   add_plot(rel_plt + guides(fill = "none"), x = 120, y = 34, width = 50, height = 26),
   add_plot(cowplot::get_legend(expr_comparison_pl), x = 135, y = 60, width = 60, height = 5),
