@@ -125,6 +125,12 @@ if(! file.exists("../data/glioblastoma/glioblastoma_sce.qs")){
 
 ```
 
+Focus analysis on control and panobinostat:
+
+```{r}
+# sce <- sce[,sce$condition %in% c("ctrl", "panobinostat")]
+```
+
 
 Quality filter scran
 
@@ -240,6 +246,7 @@ if(! file.exists("../tmp/glioblastoma_harmony_embedding_full.qs")){
 }else{
   harm <- qs::qread("../tmp/glioblastoma_harmony_embedding_full.qs")
 }
+set.seed(1)
 harm_umap <- uwot::umap(harm)
 ```
 
@@ -272,10 +279,16 @@ tibble(tumor_label, chr7 = colSums(logcounts(sce)[which(rowData(sce)$chromosome 
 Assign micro-environment cells
 
 ```{r, paged.print=FALSE}
-graph <- bluster::makeKNNGraph(harm, k = 15, BNPARAM = BiocNeighbors::AnnoyParam())
-# Warning: this step needs more than 20GB of memory
-# clustering <- igraph::cluster_walktrap(graph)
-clustering <- qs::qread("../tmp/glioblastoma_harmony_clustering.qs")
+if(! file.exists("../tmp/glioblastoma_harmony_clustering.qs")){
+  set.seed(1)
+  graph <- bluster::makeKNNGraph(harm, k = 15, BNPARAM = BiocNeighbors::AnnoyParam())
+  # Warning: this step needs more than 20GB of memory
+  clustering <- igraph::cluster_walktrap(graph)
+  qs::qsave(clustering, "../tmp/glioblastoma_harmony_clustering.qs")
+}else{
+  clustering <- qs::qread("../tmp/glioblastoma_harmony_clustering.qs")
+}
+set.seed(1)
 clusters <- igraph::cut_at(clustering, 4)
 
 as_tibble(harm_umap) %>%
@@ -312,71 +325,33 @@ as_tibble(colData(sce)) %>%
 
 
 ```{r}
-out <- scran::pairwiseWilcox(logcounts(sce), groups = ifelse(clusters == "2", "tumor", "micro"), direction = "up", lfc = 1)
-top <- scran::getTopMarkers(out$statistics, out$pairs, pairwise = FALSE)
-deframe(as_tibble(rowData(sce)[c("gid", "gene")]))[top$tumor]
-deframe(as_tibble(rowData(sce)[c("gid", "gene")]))[top$micro]
-
-tumor_markers <- c("GAP43", "TUBA1A", "S100A6", "RPS19")
-```
-
-- Gap43 is associated with mitochondria transfer in glioblastomas ([Watson, 2023](https://www.nature.com/articles/s43018-023-00556-5))
-- S100A6 has been called a biomarker for glioblastomas. Is is upregulated in TCGA and GTEx ([Hong, 2023](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC10509776/))
-
-
-
-```{r, paged.print=FALSE}
-# sel_genes <- c("GAD1", "LHX6", "ADARB2", "LAMP5", "VIP", "PVALB", "SST", "SLC17A7", "CUX2", 
-#                "RORB", "THEMIS", "FEZF2", "CTGF", "AQP4", "PDGFRA", "OPALIN", "FYB")
-# sel_genes <- c("SYT1", "DLGAP1", "ANKS1B", "ANK3", "FGF12", "MYT1L", "RBFOX1", "NRXN1", "RIMS2", "CCSER1")
-sel_genes <- c("CD14", "AIF1", "TYROBP", "CD163", "PLP1", "MAG", "SOX10", "MBP", "TRAC",
-               "TRBC1", "TRBC2", "CD3D", tumor_markers) #, "ESM1", "VWF", "CLDN5", "ITM2A", "DCN", "PDGFRB", "COL3A1", "RGS5")
-stopifnot(all(sel_genes %in% rowData(sce)$gene))
+sel_genes <- c("CD14", "TYROBP", "PLP1", "MAG", "TRBC1", "TRBC2", "GAP43") 
 gene_ids <- deframe(as_tibble(rowData(sce)[c("gene", "gid")]))[sel_genes]
 expr_mat <- counts(sce)[gene_ids, ]
+
 as_tibble(as.matrix(t(expr_mat))) %>%
-  mutate(cluster = clusters) %>%
-  # dplyr::filter(cluster %in% c(1, 2)) %>%
+  mutate(cluster = as.factor(clusters)) %>%
   pivot_longer(-cluster, names_to = "gene_id", values_to = "expr") %>%
   left_join(enframe(gene_ids,  name = "gene_name",value = "gene_id"), by = "gene_id") %>%
   summarize(mean_expr = mean(expr, trim = 0),
             frac_expr = mean(expr != 0),
             .by = c(cluster, gene_id, gene_name)) %>%
   mutate(gene_name = fct_rev(factor(gene_name, levels = sel_genes))) %>%
-  # mutate(expr = expr / max(expr), .by = c("gene_name"))  %>%
-  ggplot(aes(x = as.factor(cluster), y = gene_name)) +
-    geom_point(aes(color = log2(mean_expr + 1), size = frac_expr)) +
-    colorspace::scale_color_continuous_sequential() +
-    NULL
+  ggplot() +
+    geom_point(aes(x = cluster, y = gene_name, color = log2(mean_expr + 1), size = frac_expr), stroke = 0) +
+    colorspace::scale_color_continuous_sequential(limits = c(0, NA), breaks = c(0, 2, 4)) +
+    scale_size_binned(range = c(0.01, 3), breaks = c(0, 0.25, 0.75, 1), limits = c(0, 1), labels = c(0, "", "", 1)) +
+    labs(size = "$\\text{frac}[y \\neq 0]$", color = "expr.")
 ```
-
-
-```{r, paged.print=FALSE}
-as_tibble(harm_umap) %>%
-  bind_cols(as_tibble(colData(sce))) %>%
-  mutate(expr = as_tibble(t(as.matrix(logcounts(sce)[gene_ids,])))) %>%
-  unpack(expr, names_sep = "-") %>%
-  pivot_longer(starts_with("expr"), names_sep = "-", names_to = c(".value", "gene_id")) %>%
-  left_join(enframe(gene_ids,  name = "gene_name",value = "gene_id"), by = "gene_id") %>%
-  mutate(gene_name = fct_rev(factor(gene_name, levels = sel_genes))) %>%
-  mutate(expr = expr / max(expr), .by = c("gene_name"))  %>%
-  sample_frac() %>%
-  ggplot(aes(x = V1, y = V2)) +
-    geom_point(aes(color = expr), size = 0.1, stroke = 0) +
-    colorspace::scale_color_continuous_sequential() +
-    facet_wrap(vars(gene_name))
-```
-
-
 
 
 
 ```{r}
 cell_type_label <- case_when(
-  clusters == 1 ~ "Myeloid",
-  clusters == 2 ~ "Tumor",
+  clusters == 1 ~ "Myeloid cells",
+  clusters == 2 ~ "Tumor cells",
   clusters == 3 ~ "Oligodendrocytes",
-  clusters == 4 ~ "T cell"
+  clusters == 4 ~ "T cells"
 )
 
 as_tibble(harm_umap) %>%
@@ -393,16 +368,14 @@ as_tibble(harm_umap) %>%
 colData(sce) <- colData(sce) %>%
   as_tibble() %>%
   mutate(cell_type = cell_type_label, chr_ratio_label = tumor_label,
-         chr_10_ratio = ratio["10",], chr_7_ratio = ratio["7",]) %>%
+         chr_10_ratio = ratio["10",] / sf, chr_7_ratio = ratio["7",] / sf) %>%
   DataFrame()
 
 reducedDim(sce, "PCA") <- t(subset_pca$embedding)
+set.seed(1)
 reducedDim(sce, "UMAP") <- uwot::umap(t(subset_pca$embedding))
 reducedDim(sce, "harmony") <- harm
 reducedDim(sce, "harmony_umap") <- harm_umap
-
-
-
 
 ```
 
@@ -413,37 +386,49 @@ qs::qsave(sce, "../data/glioblastoma/glioblastoma_annotated_sce.qs")
 
 
 ```{r}
+colData(sce) %>%
+  as_tibble() %>%
+  pivot_longer(c(chr_10_ratio, chr_7_ratio), names_to = "chr", values_to = "ratio") %>%
+  ggplot(aes(x = ratio)) +
+    geom_histogram(aes(fill = cell_type == "Tumor cells"), position = "identity", alpha = 0.7, bins = 100) +
+    facet_wrap(vars(chr)) +
+    lims(x = c(0, 4))
+```
+
+
+
+```{r}
 colnames(sce) <- paste0("cell_", seq_len(ncol(sce)))
 hvg <- order(-rowVars(logcounts(sce)))
 sce <- sce[hvg[1:10000],]
 
 set.seed(1)
-fit <- lemur::lemur(sce, design = ~ condition + patient_id, n_embedding = 60, test_fraction = 0.4)
+fit <- lemur::lemur(sce, design = ~ condition + patient_id, n_embedding = 60, test_fraction = 0.5)
+set.seed(1)
 reducedDim(fit, "fit_umap") <- uwot::umap(t(fit$embedding))
+set.seed(1)
 fit <- lemur::align_harmony(fit)
+set.seed(1)
 reducedDim(fit, "fit_al_umap") <- uwot::umap(t(fit$embedding))
 fit <- lemur::test_de(fit, contrast = cond(condition = "panobinostat") - cond(condition = "ctrl"), new_assay_name = "DE_panobinostat")
-fit <- lemur::test_de(fit, contrast = cond(condition = "etoposide") - cond(condition = "ctrl"), new_assay_name = "DE_etoposide")
 
 qs::qsave(fit, "../data/glioblastoma/fit_hvg10k.qs")
 set.seed(1)
 nei_pan <- lemur::find_de_neighborhoods(fit, group_by = vars(patient_id, condition), 
-                                        contrast = cond(condition = "panobinostat") - cond(condition = "ctrl"),
                                         de_mat = assay(fit, "DE_panobinostat"), test_method = "edgeR")
 qs::qsave(nei_pan, "../data/glioblastoma/fit_hvg10k-nei_pan.qs")
 set.seed(1)
-nei_pan_tumor <- lemur::find_de_neighborhoods(fit[,fit$colData$cell_type %in% c("Tumor")], group_by = vars(patient_id, condition), 
-                                        contrast = cond(condition = "panobinostat") - cond(condition = "ctrl"),
-                                        de_mat = assay(fit, "DE_panobinostat")[,fit$colData$cell_type %in% c("Tumor")], test_method = "edgeR")
+nei_pan_tumor <- lemur::find_de_neighborhoods(fit[,fit$colData$cell_type == "Tumor cells"], group_by = vars(patient_id, condition), 
+                                        de_mat = assay(fit, "DE_panobinostat")[,fit$colData$cell_type == "Tumor cells"], test_method = "edgeR")
 qs::qsave(nei_pan_tumor, "../data/glioblastoma/fit_hvg10k-nei_pan_tumor.qs")
 
 
-as_tibble(nei_pan) %>% arrange(did_pval)
-as_tibble(nei_pan_tumor) %>% arrange(pval)
+as_tibble(nei_pan) %>% left_join(as_tibble(rowData(fit)) %>% dplyr::select(name = gid, gene_name = gene)) %>% arrange(did_pval)
+as_tibble(nei_pan_tumor) %>% left_join(as_tibble(rowData(fit)) %>% dplyr::select(name = gid, gene_name = gene)) %>% arrange(did_pval)
 
-pan_affect_genes <- c("HIST3H2A", "CD84", "MBP", "CCL7")
-tumor_bin_genes <- c("PDIA4", "HERPUD1")
-cell_type_markers <- c("CD14", "TYROBP", "PLP1", "MAG", "TRBC1", "TRBC2", "GAP43", "B2M") 
+pan_affect_genes <- c("HIST3H2A", "EPC1", "HIST3H2A", "PTPRZ1", "HBEGF", "SPATA13", "MBP")
+tumor_bin_genes <- c("LMO2", "ZFP36L1", "C10orf76", "MAGED1")
+cell_type_markers <- c("CD14", "TYROBP", "PLP1", "MAG", "TRBC1", "TRBC2", "GAP43") 
 genes_of_interest <- rowData(fit) %>%
   as_tibble() %>%
   dplyr::select(gid, gene) %>%
@@ -452,18 +437,18 @@ genes_of_interest <- rowData(fit) %>%
 fit_small <- fit[genes_of_interest$gid,]
 nei_pan_small <- nei_pan %>% filter(name %in% filter(genes_of_interest, gene %in% pan_affect_genes)$gid)
 nei_pan_tumor_small <- nei_pan_tumor %>% filter(name %in% filter(genes_of_interest, gene %in% tumor_bin_genes)$gid)
-# PDIA4 ENSG00000155660 
-# HERPUD1 ENSG00000051108
-inside_herpud1_nei <- colnames(fit[,fit$colData$cell_type == "Tumor"]) %in% filter(nei_pan_tumor_small, name == "ENSG00000051108")$neighborhood[[1]]
-psce_herpud1 <- glmGamPoi::pseudobulk(fit[,fit$colData$cell_type == "Tumor"], group_by = vars(patient_id, condition, inside = inside_herpud1_nei), n = n())
+# LMO2 is ENSG00000135363
+inside_LMO2_nei <- colnames(fit[,fit$colData$cell_type == "Tumor cells"]) %in% filter(nei_pan_tumor_small, name == "ENSG00000135363")$neighborhood[[1]]
+psce_LMO2 <- glmGamPoi::pseudobulk(fit[,fit$colData$cell_type == "Tumor cells"],
+                                   group_by = vars(patient_id, condition, inside = inside_LMO2_nei), n = n())
 ```
 
 
 ```{r}
 qs::qsave(fit_small, "../output/glioblastoma/fit_hvg10k-small.qs")
 qs::qsave(nei_pan_small, "..//output/glioblastoma/fit_hvg10k-nei_pan-small.qs")
-qs::qsave(nei_pan_tumor_small, "..//output/glioblastoma/fit_hvg10k-nei_pan_tumor-small.qs")
-qs::qsave(psce_herpud1, "../output/glioblastoma/fit_hvg10k-herpud1_psce.qs")
+qs::qsave(nei_pan_tumor_small, "../output/glioblastoma/fit_hvg10k-nei_pan_tumor-small.qs")
+qs::qsave(psce_LMO2, "../output/glioblastoma/fit_hvg10k-lmo2_psce.qs")
 qs::qsave(rowData(fit), "../output/glioblastoma/fit_hvg10-rowdata.qs")
 qs::qsave(nei_pan %>% dplyr::select(-neighborhood), "../output/glioblastoma/fit_hvg10-nei_pan-without_neighborhood.qs")
 ```
