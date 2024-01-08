@@ -236,7 +236,9 @@ kang_plot_cell_type
 # Prediction
 
 ```{r}
-pred_data <- read_tsv(glue("../benchmark/output/prediction_results-{variation}.tsv"))
+pred_data <- read_tsv(glue("../benchmark/output/prediction_results-{variation}.tsv")) %>%
+  filter(method != "CPA") %>%
+  mutate(method = ifelse(method == "CPA_large", "CPA", method))
 ```
 
 ```{r}
@@ -393,7 +395,7 @@ nei <- as_tibble(readRDS("../benchmark/output/differential-expression-kang_lemur
 
 ```{r, paged.print=FALSE}
 set.seed(1)
-umap <- uwot::umap(t(lemur_fit$embedding))
+umap <- uwot::umap(as.matrix(t(lemur_fit$embedding)))
 ```
 
 ```{r}
@@ -429,7 +431,7 @@ de_pred_pl <- as_tibble(colData(lemur_fit)) %>%
   mutate(de_pred = assay(lemur_fit, "DE")[sel_gene,]) %>%
   ggplot(aes(x = umap[,1], y = umap[,2])) +
     ggrastr::rasterize(geom_point(aes(color = de_pred), size = 0.05, stroke = 0), dpi = 600) +
-    scale_color_gradient2(limits = c(-2.5, 2.5), oob = scales::oob_squish, breaks = c(-2, 0, 2)) +
+    scale_colour_gradient2_rev(limits = c(-2.5, 2.5), oob = scales::oob_squish, breaks = c(-2, 0, 2)) +
     # scale_color_gradient2() +
     small_axis(label = "UMAP", fontsize = font_size_small) +
     labs(#title = "(G) Predicted DE + Neighborhood", 
@@ -781,4 +783,10 @@ plot_assemble(
 ```
 
 
+
+# Session Info
+
+```{r}
+sessionInfo()
+```
 
