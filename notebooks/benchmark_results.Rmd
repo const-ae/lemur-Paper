@@ -25,7 +25,7 @@ dataset_labels <- c("angelidis" = "Angelidis", "aztekin" = "Aztekin", "bunis" = 
 
 ```{r}
 method_labels <-  c("PCA" = "PCA", "harmony" = "Harmony", "invertible_harmony" = "Param. Harmony",
-                    "multiCondPCA" = "Rigid LEMUR", "lemur" = "LEMUR", "CPA" = "CPA", "CPA_large" = "CPA (64 dim)")
+                    "multiCondPCA" = "Rigid LEMUR", "lemur" = "LEMUR", "CPA" = "CPA")
 ```
 
 
@@ -33,12 +33,14 @@ method_labels <-  c("PCA" = "PCA", "harmony" = "Harmony", "invertible_harmony" =
 # Integration
 
 ```{r, paged.print = FALSE}
-int_data <- read_tsv(glue("../benchmark/output/integration_results-{variation}.tsv"))
+int_data <- read_tsv(glue("../benchmark/output/integration_results-{variation}.tsv")) %>%
+  filter(method != "CPA") %>%
+  mutate(method = ifelse(method == "CPA_large", "CPA", method))
 int_data
 ```
 
 ```{r}
-methods <- c("PCA", "harmony", "invertible_harmony", "multiCondPCA", "lemur", "CPA", "CPA_large")
+methods <- c("PCA", "harmony", "invertible_harmony", "multiCondPCA", "lemur", "CPA")
 setdiff(unique(int_data$method), methods)
 ```
 
@@ -150,8 +152,8 @@ int_bio_df <- left_join(int_data %>%  dplyr::select(data, method, comparison, mi
             dplyr::rename(ARI = value) %>%
             dplyr::select(-metric), by = c("data", "method", "comparison")) %>%
   filter(comparison == "holdout_vs_train" | method == "harmony") %>%
-  filter(method %in% c("PCA", "harmony", "lemur", "CPA","CPA_large")) %>%
-  mutate(method = factor(method, c("lemur", "PCA", "harmony", "CPA", "CPA_large"))) %>%
+  filter(method %in% c("PCA", "harmony", "lemur", "CPA")) %>%
+  mutate(method = factor(method, c("lemur", "PCA", "harmony", "CPA"))) %>%
   mutate(avg_mix = mean(mix),
          avg_ARI = mean(ARI), .by = c(data)) 
   
@@ -238,9 +240,9 @@ pred_data <- read_tsv(glue("../benchmark/output/prediction_results-{variation}.t
 ```
 
 ```{r}
-pred_methods <- c("linear", "PCA", "harmony", "invertible_harmony", "multiCondPCA", "lemur", "CPA",  "CPA_large", "no_change")
+pred_methods <- c("linear", "PCA", "harmony", "invertible_harmony", "multiCondPCA", "lemur", "CPA", "no_change")
 pred_method_labels <-  c("linear" = "Linear", "PCA" = "PCA", "harmony" = "Harmony", "invertible_harmony" = "Param. Harmony",
-                    "multiCondPCA" = "Rigid LEMUR", "lemur" = "LEMUR", "CPA" = "CPA", "CPA_large" = "CPA (64 dim)", "no_change" = "Identity")
+                    "multiCondPCA" = "Rigid LEMUR", "lemur" = "LEMUR", "CPA" = "CPA", "no_change" = "Identity")
 pred_metrics <- c("l2_mean", "l2_mean_per_celltype", "l2_sd", "l2_sd_per_celltype", "r2_mean",
                          "r2_mean_per_celltype", "r2_sd", "r2_sd_per_celltype", "mmd", "wasserstein")
 pred_metrics_labels <- c("l2_mean" = "$L_2$ mean", "l2_mean_per_celltype" = "$L_2$ mean\ncell type", "l2_sd" = "$L_2$ of S.D.",
@@ -306,8 +308,8 @@ pred_data_long <- pred_data %>%
 perf_pred_plot <- pred_data_long %>%
   filter(metric %in% c("l2_mean", "l2_mean_per_celltype")) %>%
   filter(str_starts(comparison, "holdout[12]_")) %>%
-  filter(method %in% c("no_change", "lemur", "CPA", "CPA_large")) %>%
-  mutate(method = factor(method, c("lemur", "no_change", "CPA", "CPA_large"))) %>%
+  filter(method %in% c("no_change", "lemur", "CPA")) %>%
+  mutate(method = factor(method, c("lemur", "no_change", "CPA"))) %>%
   mutate(method = fct_rev(method)) %>%
   mutate(metric = factor(metric, levels = c("l2_mean", "l2_mean_per_celltype"))) %>%
   mutate(mean_value = mean(value), .by = c(data, metric)) %>%
@@ -320,7 +322,7 @@ perf_pred_plot <- pred_data_long %>%
     facet_wrap(vars(metric), nrow = 2,  labeller = as_labeller(c("l2_mean" = "Overall error\n($L_2$ distance)", 
                                                                  "l2_mean_per_celltype" = "Error per cell type\n(Mean $L_2$ distance)"))) +
     scale_x_continuous(expand = expansion(mult = c(0, 0.1)), breaks = c(0, 1, 2)) +
-    scale_y_discrete(labels = c("lemur" = "LEMUR", "CPA" = "CPA", "CPA_large" = "CPA (64 dim)", "no_change" = "Identity")) +
+    scale_y_discrete(labels = c("lemur" = "LEMUR", "CPA" = "CPA", "no_change" = "Identity")) +
     coord_cartesian(xlim = c(0, 2)) +
     theme(axis.title.y = element_blank(), plot.title.position = "plot") +
     labs(title = "(E) Prediction performance", x = "Relative performance across 13 datasets")
