@@ -36,8 +36,8 @@ time_course_pl <- as_tibble(colData(fit_subset)) %>%
   ggplot(aes(x = umap[,1], y = umap[,2])) +
     ggrastr::rasterize(geom_point(data = tibble(umap = umaps$umap_all), size = 0.1, stroke = 0, color = "grey85"), dpi = 300) +
     ggrastr::rasterize(geom_point(size = 0.01, stroke = 0, color = "black", alpha = 0.3), dpi = 600) +
-    facet_wrap(vars(timepoint_brackets), nrow = 1) +
-    small_axis()
+    facet_wrap(vars(timepoint_brackets), nrow = 1, labeller = as_labeller(\(x) paste0("Timepoints: ", x))) +
+    small_axis(label = "UMAP")
   
 time_course_pl
 ```
@@ -68,11 +68,11 @@ umap_pl <- as_tibble(colData(fit_subset)) %>%
   mutate(umap = umaps$umap_all) %>%
   ggplot(aes(x = umap[,1], y = umap[,2])) +
     ggrastr::rasterize(geom_point(size = 0.1, stroke = 0, color = "grey85"), dpi = 600) +
-    geom_point(data = tibble(umap = umaps$umap_inter1[sel_pos,], position = seq(0, 1, l = n_pos)), aes(color = position), size = 0.6) +
-    colorspace::scale_color_continuous_divergingx(palette = "Zissou1", mid = 0.5) +
-    ggnewscale::new_scale_color() +
-    geom_point(data = tibble(umap = umaps$umap_inter2[sel_pos,], position = seq(0, 1, l = n_pos)), aes(color = position), size = 0.6) +
-    colorspace::scale_color_continuous_divergingx(palette = "Tropic", mid = 0.5) +
+    geom_point(data = tibble(umap = umaps$umap_inter1[sel_pos,], position = seq(0, 1, l = n_pos)), aes(fill = position), shape = 21, color = "black", size = 0.8, stroke = 0.1) +
+    colorspace::scale_fill_continuous_divergingx(palette = "Zissou1", mid = 0.5) +
+    ggnewscale::new_scale_fill() +
+    geom_point(data = tibble(umap = umaps$umap_inter2[sel_pos,], position = seq(0, 1, l = n_pos)), aes(fill = position), shape = 21, color = "black", size = 0.8, stroke = 0.1) +
+    colorspace::scale_fill_continuous_divergingx(palette = "Tropic", mid = 0.5) +
     small_axis(label = "UMAP")
 umap_pl
 ```
@@ -207,4 +207,11 @@ plot_assemble(
 
 ```
 
+
+
+# Session Info
+
+```{r}
+sessionInfo()
+```
 
