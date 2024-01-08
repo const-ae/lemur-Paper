@@ -9,6 +9,8 @@ pa <- argparser::add_argument(pa, "--dataset_config_override", type = "character
 
 pa <- argparser::add_argument(pa, "--n_embedding", type = "integer", default = 30, nargs = 1, help = "The number of PCA dimensions")
 pa <- argparser::add_argument(pa, "--test_fraction", type = "numeric", default = 0.5, nargs = 1, help = "The fraction of cells used for testing")
+pa <- argparser::add_argument(pa, "--split_test_training", type = "character", default = "TRUE", nargs = 1, help = "Indicator if the data is split into test and training data")
+pa <- argparser::add_argument(pa, "--do_count_splitting", type = "character", default = "FALSE", nargs = 1, help = "Indicator if the data if count splitting is used.")
 pa <- argparser::add_argument(pa, "--skip_multi_cond_pca", type = "character", default = "FALSE", help = "Set to true, to fix design to ~ 1 in first lemur fit")
 pa <- argparser::add_argument(pa, "--skip_alignment", type = "character", default = "FALSE", help = "Set to true, to skip harmony")
 pa <- argparser::add_argument(pa, "--test_method", type = "character", default = "glmGamPoi", help = "Select the test method")
@@ -35,10 +37,22 @@ set.seed(pa$seed)
 config <- get_data_config(pa$dataset_config, pa$dataset_config_override)
 skip_multi_cond_pca <- as.logical(yaml::read_yaml(text = pa$skip_multi_cond_pca))
 skip_alignment <- as.logical(yaml::read_yaml(text = pa$skip_alignment))
+do_test_training_split <- as.logical(yaml::read_yaml(text = pa$split_test_training))
+do_count_splitting <- as.logical(yaml::read_yaml(text = pa$do_count_splitting))
 out_dir <- file.path(pa$working_dir, "results/", pa$result_id)
 # ---------------------------------------
 
 sce <- qs::qread(file.path(pa$working_dir, "results", pa$data_id))
+if(do_count_splitting){
+  split <- countsplit::countsplit(assay(sce, config$assay_counts), folds = 2, epsilon = c(0.5, 0.5))
+  assay(sce, "count_training") <- split[[1]]
+  assay(sce, "count_test") <- split[[2]]
+  assay(sce, config$assay_continuous) <- transformGamPoi::shifted_log_transform(assay(sce, "count_training"))
+}
+if(! do_test_training_split || do_count_splitting){
+  message("Set test_fraction=0")
+  pa$test_fraction <- 0
+}
 
 batch_covs <- paste0(vapply(config$batch_covariates, \(x) paste0(" + ", x), FUN.VALUE = character(1L)), collapse = "", recycle0 = TRUE)
 full_formula_string <-  paste0("~ fake_condition ", batch_covs)
@@ -58,6 +72,12 @@ lemur_align_time <- system.time({
   }
 })
 
+test_assay <- if(pa$test_method == "limma"){
+  config$assay_continuous
+}else{
+  config$assay_counts
+}
+
 if(skip_multi_cond_pca){
   lemur_test_time <- system.time({
     pred1 <- predict(fit, newdesign = 1, alignment_design_matrix =  lemur:::parse_contrast(cond(fake_condition = "fake_trt"), fit$alignment_design, simplify = TRUE))
@@ -69,19 +89,43 @@ if(skip_multi_cond_pca){
                                  de_mat = pred1 - pred2,
                                  selection_procedure = pa$test_selection_method,
                                  directions = pa$test_direction_method, size_factor_method = pa$test_size_factor_method,
-                                 count_assay_name = config$assay_counts)                                                      
+                                 count_assay_name = test_assay)                                                      
   })
   
 }else{
   lemur_test_time <- system.time({
     fit <- test_de(fit, contrast = cond(fake_condition = "fake_trt") - cond(fake_condition = "fake_ctrl"))
   })
-  lemur_nei_time <- system.time({
-    nei <- find_de_neighborhoods(fit, group_by = vars(fake_condition, sample), test_method = pa$test_method,
-                                 selection_procedure = pa$test_selection_method,
-                                 directions = pa$test_direction_method, size_factor_method = pa$test_size_factor_method,
-                                 count_assay_name = config$assay_counts)
-  })
+  if(! do_count_splitting && do_test_training_split){
+    # Default
+    lemur_nei_time <- system.time({
+      nei <- find_de_neighborhoods(fit, group_by = vars(fake_condition, sample), test_method = pa$test_method,
+                                   selection_procedure = pa$test_selection_method,
+                                   directions = pa$test_direction_method, size_factor_method = pa$test_size_factor_method,
+                                   count_assay_name = test_assay)
+    })
+  }else if(do_count_splitting){
+    if(pa$test_method == "limma") {
+      assay(sce, "count_training") <- transformGamPoi::shifted_log_transform(assay(sce, "count_training"))
+    }
+    lemur_nei_time <- system.time({
+      nei <- find_de_neighborhoods(fit, group_by = vars(fake_condition, sample), test_method = pa$test_method,
+                                   selection_procedure = pa$test_selection_method,
+                                   directions = pa$test_direction_method, size_factor_method = pa$test_size_factor_method,
+                                   count_assay_name = "count_test",
+                                   test_data = fit$training_data)
+    })
+  }else if(! do_test_training_split){
+    lemur_nei_time <- system.time({
+      nei <- find_de_neighborhoods(fit, group_by = vars(fake_condition, sample), test_method = pa$test_method,
+                                   selection_procedure = pa$test_selection_method,
+                                   directions = pa$test_direction_method, size_factor_method = pa$test_size_factor_method,
+                                   count_assay_name = test_assay,
+                                   test_data = fit$training_data)
+    })
+  }else{
+    stop("illegal case combination")
+  }
 }
 
 print(table(nei$adj_pval < 0.1, fit$rowData$is_simulated))
