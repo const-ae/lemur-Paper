@@ -25,7 +25,7 @@ dataset_labels <- c("angelidis" = "Angelidis", "aztekin" = "Aztekin", "bunis" = 
 
 ```{r}
 method_labels <-  c("PCA" = "PCA", "harmony" = "Harmony", "invertible_harmony" = "Param. Harmony",
-                    "multiCondPCA" = "Rigid LEMUR", "lemur" = "LEMUR", "CPA" = "CPA")
+                    "multiCondPCA" = "Rigid LEMUR", "lemur" = "LEMUR", "CPA" = "CPA", "CPA_large" = "CPA (64 dim)")
 ```
 
 
@@ -38,7 +38,7 @@ int_data
 ```
 
 ```{r}
-methods <- c("PCA", "harmony", "invertible_harmony", "multiCondPCA", "lemur", "CPA")
+methods <- c("PCA", "harmony", "invertible_harmony", "multiCondPCA", "lemur", "CPA", "CPA_large")
 setdiff(unique(int_data$method), methods)
 ```
 
@@ -150,8 +150,8 @@ int_bio_df <- left_join(int_data %>%  dplyr::select(data, method, comparison, mi
             dplyr::rename(ARI = value) %>%
             dplyr::select(-metric), by = c("data", "method", "comparison")) %>%
   filter(comparison == "holdout_vs_train" | method == "harmony") %>%
-  filter(method %in% c("PCA", "harmony", "lemur", "CPA")) %>%
-  mutate(method = factor(method, c("lemur", "PCA", "harmony", "CPA"))) %>%
+  filter(method %in% c("PCA", "harmony", "lemur", "CPA","CPA_large")) %>%
+  mutate(method = factor(method, c("lemur", "PCA", "harmony", "CPA", "CPA_large"))) %>%
   mutate(avg_mix = mean(mix),
          avg_ARI = mean(ARI), .by = c(data)) 
   
@@ -238,9 +238,9 @@ pred_data <- read_tsv(glue("../benchmark/output/prediction_results-{variation}.t
 ```
 
 ```{r}
-pred_methods <- c("linear", "PCA", "harmony", "invertible_harmony", "multiCondPCA", "lemur", "CPA", "no_change")
+pred_methods <- c("linear", "PCA", "harmony", "invertible_harmony", "multiCondPCA", "lemur", "CPA",  "CPA_large", "no_change")
 pred_method_labels <-  c("linear" = "Linear", "PCA" = "PCA", "harmony" = "Harmony", "invertible_harmony" = "Param. Harmony",
-                    "multiCondPCA" = "Rigid LEMUR", "lemur" = "LEMUR", "CPA" = "CPA", "no_change" = "Identity")
+                    "multiCondPCA" = "Rigid LEMUR", "lemur" = "LEMUR", "CPA" = "CPA", "CPA_large" = "CPA (64 dim)", "no_change" = "Identity")
 pred_metrics <- c("l2_mean", "l2_mean_per_celltype", "l2_sd", "l2_sd_per_celltype", "r2_mean",
                          "r2_mean_per_celltype", "r2_sd", "r2_sd_per_celltype", "mmd", "wasserstein")
 pred_metrics_labels <- c("l2_mean" = "$L_2$ mean", "l2_mean_per_celltype" = "$L_2$ mean\ncell type", "l2_sd" = "$L_2$ of S.D.",
@@ -306,8 +306,8 @@ pred_data_long <- pred_data %>%
 perf_pred_plot <- pred_data_long %>%
   filter(metric %in% c("l2_mean", "l2_mean_per_celltype")) %>%
   filter(str_starts(comparison, "holdout[12]_")) %>%
-  filter(method %in% c("no_change", "lemur", "CPA")) %>%
-  mutate(method = factor(method, c("lemur", "no_change", "CPA"))) %>%
+  filter(method %in% c("no_change", "lemur", "CPA", "CPA_large")) %>%
+  mutate(method = factor(method, c("lemur", "no_change", "CPA", "CPA_large"))) %>%
   mutate(method = fct_rev(method)) %>%
   mutate(metric = factor(metric, levels = c("l2_mean", "l2_mean_per_celltype"))) %>%
   mutate(mean_value = mean(value), .by = c(data, metric)) %>%
@@ -320,7 +320,7 @@ perf_pred_plot <- pred_data_long %>%
     facet_wrap(vars(metric), nrow = 2,  labeller = as_labeller(c("l2_mean" = "Overall error\n($L_2$ distance)", 
                                                                  "l2_mean_per_celltype" = "Error per cell type\n(Mean $L_2$ distance)"))) +
     scale_x_continuous(expand = expansion(mult = c(0, 0.1)), breaks = c(0, 1, 2)) +
-    scale_y_discrete(labels = c("lemur" = "LEMUR", "CPA" = "CPA", "no_change" = "Identity")) +
+    scale_y_discrete(labels = c("lemur" = "LEMUR", "CPA" = "CPA", "CPA_large" = "CPA (64 dim)", "no_change" = "Identity")) +
     coord_cartesian(xlim = c(0, 2)) +
     theme(axis.title.y = element_blank(), plot.title.position = "plot") +
     labs(title = "(E) Prediction performance", x = "Relative performance across 13 datasets")
@@ -656,6 +656,7 @@ var_expl_overall_pl <- var_expl %>%
   filter(subset == "all") %>%
   filter(! is.na(var_expl)) %>%
   mutate(method = factor(method, levels = c("lemur", "pca"), labels = c("LEMUR", "PCA"))) %>%
+  mutate(dataset = fct_reorder(dataset, n_cells)) %>%
   mutate(is_row_subset = n_genes == 500) %>%
   ggplot(aes(x = dimensions, y = var_expl * 100)) +
     geom_hline(yintercept = 0, linewidth = 0.3) +
@@ -663,7 +664,7 @@ var_expl_overall_pl <- var_expl %>%
     ggh4x::facet_grid2(vars(is_row_subset), vars(dataset), 
                labeller = ggplot2::labeller(is_row_subset = as_labeller(c("TRUE" = "500 HVG", "FALSE" = "All Genes")), dataset = as_labeller(dataset_labels)),
                strip = ggh4x::strip_vanilla(clip = "off")) +
-    scale_x_continuous(breaks = c(0, 100, 200)) +
+    scale_x_continuous(breaks = c(0, 100, 200), expand = expansion(mult = c(0, 0.1))) +
     scale_y_continuous(expand = expansion(mult = c(0)), breaks = c(0, 25, 50, 75, 100), limits = c(0, 100)) +
     labs(y = "Percent variance explained", x = "Latent dimensions", color = "", linetype = "",
          title = "(A) Variance explained") +
@@ -671,11 +672,11 @@ var_expl_overall_pl <- var_expl %>%
           panel.grid.major.y = element_line("lightgrey", linewidth = 0.2),
           panel.spacing.y = unit(5, "mm"), panel.spacing.x = unit(3, "mm"))
 
-var_duration_pl1 <- 0
-var_expl %>%
+var_duration_pl1 <- var_expl %>%
   filter(subset == "all" | is.na(subset)) %>%
-  filter(dimensions > 0) %>%
-  # mutate(method = factor(method, levels = c("lemur", "pca"), labels = c("LEMUR", "PCA"))) %>%
+  filter(dimensions > 3) %>%
+  mutate(method = factor(method, levels = c("lemur", "pca", "lemur_landmark", "lemur_harmony"), 
+                         labels = c("LEMUR", "PCA", "LEMUR + Landmark Alignment", "LEMUR + Harmony Alignment"))) %>%
   mutate(is_row_subset = n_genes == 500) %>%
   mutate(original_n_genes = max(n_genes), .by = dataset) %>%
   mutate(dataset = fct_reorder(dataset, n_cells)) %>%
@@ -683,9 +684,9 @@ var_expl %>%
   group_map(\(data, key){
     is_subset <- key[[1]][1]
     data$is_row_subset <- is_subset
-    if(! is_subset){
-      data$elapsed <- data$elapsed / 60
-    }
+    # if(! is_subset){
+    data$elapsed <- data$elapsed / 60
+    # }
     ggplot(data, aes(x = dimensions, y = elapsed)) +
       geom_hline(yintercept = 0, linewidth = 0.3) +
       geom_hline(yintercept = c(), linewidth = 0.3) +
@@ -696,13 +697,16 @@ var_expl %>%
                                               n_cells = as_labeller(\(x) glue("\\tiny{{$C={scales::comma_format()(as.numeric(x))}$}}")),
                                               original_n_genes = as_labeller(\(x) glue("\\tiny{{$G={scales::comma_format()(as.numeric(x))}$}}"))),
                  strip = ggh4x::strip_vanilla(clip = "off"), scales = "free_y") +
-      scale_x_continuous(breaks = c(0, 100, 200)) +
-      scale_y_log10(expand = expansion(mult = c(0, 0.1)), limits = c(1, NA)) +
-      coord_cartesian(ylim = c(0, if(is_subset) 60 else 20)) +
-      labs(y = if(is_subset) "Elapsed time [sec.]" else "Elapsed time [min.]",
+      scale_x_continuous(breaks = c(0, 100, 200), expand = expansion(mult = c(0, 0.1))) +
+      scale_y_continuous(expand = expansion(mult = c(0, 0.1))) +
+      scale_color_manual(values = scales::hue_pal()(4) |> magrittr::set_names(c("LEMUR", "LEMUR + Landmark Alignment", "PCA", "LEMUR + Harmony Alignment"))) +
+      scale_linetype_manual(values = c("LEMUR" = "solid", "LEMUR + Landmark Alignment"  = "22", "PCA"  = "22", "LEMUR + Harmony Alignment"  = "solid")) +
+      coord_cartesian(ylim = c(0, if(is_subset) 4 else 11)) +
+      labs(y = "Elapsed time [min.]",
            x = "Latent dimensions", color = "", linetype = "",
            title = "(B) Computation Time") +
-      theme(legend.position = "bottom", strip.text.x = element_text(color = if(is_subset) "#00000000" else "black", margin = margin(t = 0.3, b = 0, unit = "mm")),
+      theme(legend.position = "bottom", 
+            strip.text.x = element_text(color = if(is_subset) "#00000000" else "black", margin = margin(t = 0.3, b = 0, unit = "mm")),
             plot.title = element_text(color = if(is_subset) "#00000000" else "black"),
             panel.grid.major.y = element_line("lightgrey", linewidth = 0.2),
             panel.spacing.y = unit(5, "mm"), panel.spacing.x = unit(3, "mm"))
@@ -721,6 +725,12 @@ var_expl %>%
   filter(n_genes != 500)
 ```
 
+```{r, paged.print=FALSE}
+var_expl %>%
+  filter(dataset == "mouse_gastrulation") %>%
+  filter(dimensions == 200) %>%
+  filter(n_genes != 500)
+```
 
 
 ```{r, paged.print = FALSE}

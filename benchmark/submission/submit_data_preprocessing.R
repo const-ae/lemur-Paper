@@ -15,6 +15,7 @@ make_integration_jobs <- function(dataset, variation = "small"){
   default_params <- list(data_id = job$result_id, dataset_config = dataset)
   integration_jobs <- list(
     CPA = cpa_integration_prediction(default_params, dep_job = job, memory = mem),
+    CPA_large = cpa_integration_prediction(c(default_params, list(n_latent = 64, max_epochs = 2000)), dep_job = job, memory = mem),
     harmony = harmony_integration(default_params, dep_job = job, memory = mem),
     PCA = pca_integration_prediction(default_params, dep_job = job, memory = mem),
     lemur = lemur_integration_prediction(default_params, dep_job = job, memory = mem),
@@ -34,6 +35,7 @@ make_visualization_jobs <- function(dataset, variation = "small"){
   default_params <- list(data_id = job$result_id, dataset_config = dataset)
   integration_jobs <- list(
     CPA = cpa_integration_prediction(default_params, dep_job = job, memory = mem),
+    CPA_large = cpa_integration_prediction(c(default_params, list(n_latent = 64, max_epochs = 2000)), dep_job = job, memory = mem),
     harmony = harmony_integration(default_params, dep_job = job, memory = mem),
     PCA = pca_integration_prediction(default_params, dep_job = job, memory = mem),
     lemur = lemur_integration_prediction(default_params, dep_job = job, memory = mem),
@@ -55,6 +57,7 @@ make_prediction_jobs <- function(dataset, variation = "small"){
     linear = linear_prediction(default_params, dep_job = job, memory = mem),
     no_change = no_change_prediction(default_params, dep_job = job, memory = mem),
     CPA = cpa_integration_prediction(default_params, dep_job = job, memory = mem),
+    CPA_large = cpa_integration_prediction(c(default_params, list(n_latent = 64, max_epochs = 2000)), dep_job = job, memory = mem),
     PCA = pca_integration_prediction(default_params, dep_job = job, memory = mem),
     lemur = lemur_integration_prediction(default_params, dep_job = job, memory = mem),
     invertible_harmony = lemur_integration_prediction(c(default_params, list(skip_multi_cond_pca = "true")), dep_job = job, memory = mem),
@@ -68,10 +71,9 @@ make_prediction_jobs <- function(dataset, variation = "small"){
 }
 
 make_variance_explained_jobs <- function(dataset, variation = "small"){
-  mem <- if(dataset %in% c("reyfman","mouse_gastrulation", "hrvatin", "goldfarbmuren"))  "250GB" else "40GB"
+  mem <- if(dataset %in% c("reyfman","mouse_gastrulation", "hrvatin", "goldfarbmuren"))  "120GB" else "40GB"
   job <- prepare_data(list(dataset = dataset,  variation = variation), memory = mem) 
   pca_dims <- c(1, 2, 3, 5, 7, 10, 15, 20, 30, 40, 50, 75, 100, 150, 200)
-  if(variation == "random_holdout" && dataset %in% c("mouse_gastrulation", "hrvatin")) pca_dims <- c(1, 2, 3, 5, 7, 10, 15, 20, 30, 40, 50, 75, 100)
   calc_variance_explained(params = list(data_id = job$result_id, dataset_config = dataset, pca_dims = pca_dims),
                           dep_jobs = list(job), memory = mem)
 }
@@ -104,7 +106,7 @@ walk(var_jobs, run_job, priority = "normal")
 var_jobs %>%
   keep(\(j) job_status(j) == "done") %>%
   map_df(\(j) read_tsv(result_file_path(j), show_col_types = FALSE)) %>%
-  write_tsv(glue::glue("output/variance_explained.tsv.gz"))
+  write_tsv(glue::glue("output/variance_explained.tsv"))
 
 get_result_table <- function(jobs){
   job_df <- tibble(name = names(jobs), job = jobs) %>%
