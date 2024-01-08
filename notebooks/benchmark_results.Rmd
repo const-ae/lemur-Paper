@@ -549,9 +549,11 @@ de_power_fdr_with_label <- de_power_fdr %>%
     str_starts(es, "testfrac_") ~ glue("$\\text{{test fraction}} = {as.numeric(str_remove(es, 'testfrac_')) * 100}\\%$"),
     es == "sel_contrast" ~ "contrast selection",
     es == "dir_contrast" ~ "contrast directions",
-    es == "skip_al" ~ "Rigid LEMUR",
+    es == "skip_al" ~ "$S=I$ (rigid)",
     es == "skip_multCondPCA" ~ "parametric harmony",
     es == "sf_method_ratio" ~ "ratio size factor estimation",
+    es == "count_split" ~ "count splitting",
+    es == "notesttraining" ~ "no test/train split",
     TRUE ~ es
   )) %>%
   mutate(method = factor(method, levels = c("global", "celltype", "cluster", "miloDE", "lemur"),
@@ -603,9 +605,9 @@ plot_assemble(
   add_text("(A) FDR control for all methods", x = 2.7, y = 2, fontsize = font_size, vjust = 1, fontface = "bold"),
   add_plot(cowplot::plot_grid(plotlist = fdr_control_plots, ncol = 1, rel_heights = c(1,2)), x = 0, y = 5, width = 170, height = 120),
   add_text("(B) Average power for all methods at $\\textrm{FDR} = 10\\%$", x = 2.7, y = 125, fontsize = font_size, vjust = 1, fontface = "bold"),
-  add_plot(all_methods_power, x = 0, y = 130, width = 130, height = 80),
+  add_plot(all_methods_power, x = 0, y = 130, width = 130, height = 100),
 
-  width = 170, height = 210, units = "mm", show_grid_lines = FALSE,
+  width = 170, height = 230, units = "mm", show_grid_lines = FALSE,
   latex_support = TRUE, filename = "../plots/suppl_all_fdr_power.pdf"
 )
 
