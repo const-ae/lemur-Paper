@@ -3,7 +3,31 @@
 
 This folder contains the scripts and folder structure for the benchmarking bits of the LEMUR paper. For efficiency reasons, all computationally intensive were run on our EMBL cluster system. The plotting was done locally though to iterate more quickly. The data in this folder copied over to my local machine by calling `../copy_benchmark_project.sh`.
 
+# Execution
 
+The project is designed to execute all scripts using the [`MyWorkflowManager`](https://github.com/const-ae/MyWorkflowManager) and the slurm cluster manager. Install the `MyWorkflowManager` R package from Github and then follow the steps outlined in Tasks.
+Alternatively, you can call each script directly from the command line providing the appropriate input arguments. For example to prepare a dataset for the differential expression benchmark, you could call:
+
+```bash
+ahlmanne@cluster$ Rscript src/prepare_data_for_de.R  \
+  --dataset angelidis \
+  --condition 3m \
+  --randomize cells \
+  --cut_at 1 10 25 \
+  --n_de_genes 200 \
+  --working_dir /tmp/ahlmanne/benchmark \
+  --result_id 1
+```
+
+To subsequently run LEMUR's differential expression analysis, call:
+```bash
+ahlmanne@cluster$ Rscript src/lemur_differential_expression.R  \
+  --data_id 1 \
+  --dataset_config angelidis \
+  --split_test_training FALSE \
+  --working_dir /tmp/ahlmanne/benchmark \
+  --result_id 1-split_test_training
+```
 
 # Tasks
 
