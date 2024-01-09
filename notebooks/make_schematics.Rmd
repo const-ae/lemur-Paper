@@ -85,16 +85,34 @@ df <- tibble(patient = sample(c("A", "B"), size = 30, replace = TRUE),
 mm <- model.matrix(~ patient + cond, data = df)
 rownames(mm) <- paste0("Cell_", seq_len(nrow(mm)))
 
-as_tibble(mm, rownames = "Cell") %>%
+pl1 <- as_tibble(mm, rownames = "Cell") %>%
+  dplyr::select(- patientB) %>%
   pivot_longer(-Cell, names_to = "Cov") %>%
   mutate(Cell = factor(Cell, levels = rownames(mm)),
          Cov = factor(Cov, levels = rev(colnames(mm)))) %>%
   ggplot(aes(x = Cell, y = Cov)) +
     geom_tile(aes(fill = value), color = "grey", show.legend = FALSE) +
-    geom_text(aes(label = value, colour = after_scale(contrast(fill)))) +
+    # geom_text(aes(label = value, colour = after_scale(contrast(fill)))) +
+    geom_text(aes(label = value, colour = value), show.legend = FALSE, size = 4 / .pt) +
     colorspace::scale_fill_continuous_sequential(palette = "Grays", begin = 0.05, end = 0.9) +
+    colorspace::scale_color_continuous_sequential(palette = "Grays", end = 0.05, begin = 0.9) +
     theme_void() +
     coord_fixed()
+
+ggsave("../plots/schematic_elements/design_matrix.pdf", pl1, unit = "cm", width = 4.7, height = 2, dpi = 300)
+
+pl2 <- tibble(patient = c(sample(c("A", "B"), size = 19, replace = TRUE),
+                   sample(c("C", "D"), size = 11, replace = TRUE))) %>%
+  mutate(patient = sort(patient)) %>%
+  mutate(Cell = as.factor(seq_len(30))) %>%
+  mutate(fake = "A") %>%
+  ggplot(aes(x = Cell, y = fake)) +
+    geom_tile(color = "grey", fill = "#00000000", show.legend = FALSE) +
+    geom_text(aes(label = patient), show.legend = FALSE, size = 4 / .pt) +
+    theme_void() +
+    coord_fixed()
+
+ggsave("../plots/schematic_elements/sample_vec.pdf", pl2, unit = "cm", width = 4.7, height = 1, dpi = 300)
 ```
 
 
