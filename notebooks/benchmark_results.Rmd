@@ -8,6 +8,7 @@ title: "R Notebook"
 library(SingleCellExperiment)
 library(tidyverse)
 library(glue)
+library(lemur)
 source("util.R")
 ```
 
