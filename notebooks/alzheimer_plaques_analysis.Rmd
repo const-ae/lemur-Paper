@@ -7,6 +7,7 @@ title: "R Notebook"
 library(tidyverse)
 library(glue)
 library(SingleCellExperiment)
+library(lemur)
 source("util.R")
 ```
 
@@ -144,18 +145,24 @@ de_plot_data <- as_tibble(colData(fit), rownames = "cell_id") %>%
   pivot_longer(starts_with("de-"), names_sep = "-", values_to = "de", names_to = c(NA, "symbol")) %>%
   inner_join(is_inside, by = c("symbol", "cell_id")) %>%
   group_by(symbol) %>%
-  mutate(de = scale_sym(de, ignore_extreme = 0.05)) %>%
+  # mutate(de = scale_sym(de, ignore_extreme = 0.05)) %>%
   sample_frac(size = 1) 
+
+abs_max <- max(abs(quantile(de_plot_data$de, c(0.9, 0.1))))
 
 jun_de_pl <- de_plot_data %>%
   mutate(inside = ifelse(inside, "in", "out")) %>%
   mutate(inside = factor(inside, levels = c("in", "out")))  %>%
   ggplot(aes(x = umap[,2], y = umap[,1])) +
-    ggrastr::rasterise(geom_point(aes(color = de), size = 0.05, stroke = 0, show.legend = FALSE), dpi = 600) +
-    scale_colour_gradient2_rev(limits = c(-1, 1), oob = scales::squish, breaks = c(-1, 0, 1), na.value = "#00000000") +
-    facet_grid(vars(inside), labeller = labeller(inside = as_labeller(c("in" = "Inside Neighborhood", "out" = "Outside Neighborhood"))),
+    ggrastr::rasterise(geom_point(aes(color = de), size = 0.05, stroke = 0), dpi = 600) +
+    # scale_colour_gradient2_rev(limits = c(-1, 1), oob = scales::squish, breaks = c(-1, 0, 1), na.value = "#00000000") +
+    scale_colour_gradient2_rev(limits = c(-1, 1) * signif(abs_max, 1), oob = scales::squish, breaks = c(-1, 0, 1) * signif(abs_max, 1)) +
+    facet_grid(vars(inside), labeller = labeller(inside = as_labeller(c("in" = "Inside Neighb.", "out" = "Outside Neighb."))),
                switch="y") +
-    small_axis("UMAP", fontsize = font_size_small) 
+    small_axis("UMAP", fontsize = font_size_small) +
+    theme(legend.position = "bottom", legend.margin = margin(t = -2, unit = "mm")) +
+    guides(color = guide_colorbar(barheight = unit(1, "mm"), barwidth = unit(10, "mm"), title.vjust = 1)) +
+    labs(color = "$\\Delta$")
 
 jun_de_pl
 ```
