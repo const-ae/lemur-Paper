@@ -548,7 +548,7 @@ system.time({
 <pre><code>## ---Fit Grassmann linear model</code></pre>
 <pre><code>## Final error: 1.45e+08</code></pre>
 <pre><code>##    user  system elapsed 
-## 906.150  83.857 657.177</code></pre>
+## 743.879  52.858 502.290</code></pre>
 <pre class="r"><code>reducedDim(fit, &quot;initial_embedding&quot;) &lt;- t(fit$embedding)
 system.time({
   fit &lt;- lemur::align_harmony(fit)
@@ -590,12 +590,12 @@ system.time({
 ## Warning: Quick-TRANSfer stage steps exceeded maximum (= 33521450)</code></pre>
 <pre><code>## Converged</code></pre>
 <pre><code>##     user   system  elapsed 
-## 4620.149  287.444 3184.117</code></pre>
+## 3748.773  165.164 2124.162</code></pre>
 <pre class="r"><code>system.time({
   fit &lt;- lemur::test_de(fit, cond(timepoint = 48) - cond(timepoint = 24))
 })</code></pre>
 <pre><code>##    user  system elapsed 
-## 119.869 193.002  59.363</code></pre>
+##  85.105 127.812  39.975</code></pre>
 <pre class="r"><code>system.time({
   nei &lt;- lemur::find_de_neighborhoods(fit, group_by = vars(embryo, timepoint), test_method = &quot;edgeR&quot;)
 })</code></pre>
@@ -605,8 +605,8 @@ system.time({
 <pre><code>## Calculate size factors for each gene</code></pre>
 <pre><code>## Fit edgeR model on pseudobulk data</code></pre>
 <pre><code>## Fit diff-in-diff effect</code></pre>
-<pre><code>##     user   system  elapsed 
-## 1476.760  106.861 1451.715</code></pre>
+<pre><code>##    user  system elapsed 
+## 977.924  30.575 978.720</code></pre>
 <pre class="r"><code>set.seed(1)
 reducedDim(fit, &quot;umap_embedding&quot;, withDimnames = FALSE) &lt;- uwot::umap(t(fit$embedding))
 reducedDim(fit, &quot;umap_initial_embedding&quot;, withDimnames = FALSE) &lt;- uwot::umap(reducedDim(fit, &quot;initial_embedding&quot;))

@@ -1,0 +1,5 @@
+
+sbatch submission/run_prepare_alzheimer_plaques.sh
+sbatch submission/run_prepare_glioblastoma.sh
+sbatch submission/run_prepare_zebrafish.sh
+
