@@ -692,7 +692,7 @@ plot_assemble(
   add_plot(cowplot::get_legend(condition_legend), x = 3, y = 31 , height = 34),
   add_text("UMAP of $Y$", x = 25 + row1_umap_width * 0.5, y = 30, vjust = 1, hjust = 0.5, fontsize = 7),
   add_text("UMAP of $Z$ if $S = I$", x = 25 + row1_umap_width * 1.5, y = 30, vjust = 1, hjust = 0.5, fontsize = 7),
-  add_text("UMAP of $Z$ if $S$ estimated with harmony", x = 25 + row1_umap_width * 2.5, y = 30, vjust = 1, hjust = 0.5, fontsize = 7),
+  add_text("UMAP of $Z$ if $S$ estimated with Harmony", x = 25 + row1_umap_width * 2.5, y = 30, vjust = 1, hjust = 0.5, fontsize = 7),
   add_plot(umap_orig_pc_pl, x = 25 + row1_umap_width * 0, y = 31, width = row1_umap_width, height = 40),
   add_plot(umap_fit_pc_pl, x = 25 + row1_umap_width * 1, y = 31, width = row1_umap_width, height = 40),
   add_plot(umap_fital_pc_pl, x = 25 + row1_umap_width * 2, y = 31, width = row1_umap_width, height = 40),
