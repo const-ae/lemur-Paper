@@ -85,7 +85,7 @@ cell_type_dot_plot <- as_tibble(as.matrix(t(expr_mat))) %>%
     scale_fill_manual(values = cell_type_colors) +
     scale_size_binned(range = c(0.01, 3), breaks = c(0, 0.25, 0.75, 1), limits = c(0, 1), labels = c(0, "", "", 1)) +
     scale_x_discrete(expand = expansion(add = 0.3)) +
-    scale_y_discrete(expand = expansion(add = 0.4)) +
+    scale_y_discrete(expand = expansion(add = 0.4), labels = \(x) paste0("\\emph{", x, "}")) +
     coord_cartesian(clip = "off") +
     guides(color = guide_colorbar(barheight = unit(1, "mm"), barwidth = unit(5, "mm"), title.vjust = 0.25, label.position = "top", label.vjust = -2),
            size = guide_bins(label.vjust = -11)) +
@@ -141,7 +141,8 @@ manual_text_pos <- tribble(
       "PLP1",     1,   18,   0.5,       0,
      "GAP43",   -15,   -9,     1,       0,
   "HIST3H2A",     4,  -18,     0,       0,
-)
+) %>%
+  mutate(gene_label = paste0("\\emph{", gene, "}"))
 
 # eto_proj <- lemur:::grassmann_map(lemur:::sum_tangent_vectors(fit_small$coefficients, c(1, 1, 0, rep(0, times = 5))), fit_small$base_point)[,1:2]
 # rownames(eto_proj) <- full_row_data$gid
@@ -158,7 +159,7 @@ mc_biplot_marker <- as_tibble(colData(fit_small)) %>%
     geom_segment(data = proj_df %>% filter(gene != "HIST3H2A"), aes(x = 0, y = 0, xend = V1 * 200, yend = V2 * 200, color = condition), linewidth = 1.2, show.legend = FALSE) +
     geom_point(data = proj_df %>% filter(gene != "HIST3H2A") %>% arrange(desc(condition)), aes(x = V1 * 200, y = V2 * 200, color = condition), size = 0.6, show.legend = FALSE) +
     scale_color_manual(values = condition_colors) +
-    geom_text(data = manual_text_pos %>% filter(gene != "HIST3H2A"), aes(x = V1, y = V2, hjust = hjust, vjust = vjust, label = gene), size = font_size_small / .pt) +
+    geom_text(data = manual_text_pos %>% filter(gene != "HIST3H2A"), aes(x = V1, y = V2, hjust = hjust, vjust = vjust, label = gene_label), size = font_size_small / .pt) +
     # coord_fixed(ylim = c(-20, 25), xlim = c(-40, 20), clip = "off") +
     small_axis(label = "$Z$ space", xlim = c(-40, 40), ylim = c(-20, 25)) +
     labs(x = "$Z_1$", y ="$Z_2$")
@@ -172,7 +173,7 @@ mc_biplot_diff <- as_tibble(colData(fit_small)) %>%
     geom_segment(data = proj_df %>% filter(gene == "HIST3H2A") %>% arrange(desc(condition)), aes(x = 0, y = 0, xend = V1 * 2000, yend = V2 * 2000, color = condition), linewidth = 1.2, show.legend = FALSE) +
     geom_point(data = proj_df %>% filter(gene == "HIST3H2A") %>% arrange(desc(condition)), aes(x = V1 * 2000, y = V2 * 2000,color = condition), size = 0.6, show.legend = FALSE) +
     scale_color_manual(values = condition_colors) +
-    geom_text(data = manual_text_pos %>% filter(gene == "HIST3H2A"), aes(x = V1, y = V2, hjust = hjust, vjust = vjust, label = gene), size = font_size_small / .pt) +
+    geom_text(data = manual_text_pos %>% filter(gene == "HIST3H2A"), aes(x = V1, y = V2, hjust = hjust, vjust = vjust, label = gene_label), size = font_size_small / .pt) +
     # coord_fixed(ylim = c(-20, 25), xlim = c(-40, 20), clip = "off") +
     small_axis(label = "$Z$ space", xlim = c(-40, 40), ylim = c(-25, 20)) +
     labs(x = "$Z_1$", y ="$Z_2$")
@@ -281,7 +282,8 @@ de_plots <- de_plot_data %>%
     ggplot(data, aes(x = umap[,1], y = umap[,2])) +
       ggrastr::rasterise(geom_point(aes(color = de), size = 0.05, stroke = 0), dpi = 600) +
       scale_colour_gradient2_rev(limits = c(-1, 1) * signif(abs_max, 1), oob = scales::squish, breaks = c(-1, 0, 1) * signif(abs_max, 1)) +
-      facet_grid(vars(inside), vars(gene), labeller = labeller(inside =as_labeller( c("in" = "Inside Neighb.", "out" = "Outside Neighb"))), switch = "y")  +
+      facet_grid(vars(inside), vars(gene), labeller = labeller(inside =as_labeller( c("in" = "Inside Neighb.", "out" = "Outside Neighb")),
+                                                               gene = as_labeller(\(x) paste0("\\emph{", x, "}"))), switch = "y")  +
       scale_x_continuous(limits = range(umap_fit[,1]) * 1.1) +
       scale_y_continuous(limits = range(umap_fit[,2]) * 1.1) +
       small_axis(label = "", fontsize = font_size_tiny, xlim = range(umap_fit[,1]), ylim = range(umap_fit[,2]), arrow_length = 3) +
@@ -339,7 +341,7 @@ expr_plots <- expr_plot_data %>%
                      h = apply(umap_fit, 2, MASS::bandwidth.nrd) * 0.9,
                      show.legend = FALSE) +
       colorspace::scale_color_continuous_sequential(limits = c(0, quantile(data$expr, c(0.98))), oob = scales::oob_squish, palette = "Purples 2", n.breaks = 3) +
-      facet_grid(vars(condition), vars(gene), switch = "y")  +
+      facet_grid(vars(condition), vars(gene), labeller = labeller(gene = as_labeller(\(x) paste0("\\emph{", x, "}"))), switch = "y")  +
       scale_x_continuous(limits = range(umap_fit[,1]) * 1.1) +
       scale_y_continuous(limits = range(umap_fit[,2]) * 1.1) +
       small_axis(label = "", fontsize = font_size_tiny, xlim = range(umap_fit[,1]), ylim = range(umap_fit[,2]), arrow_length = 3) +
@@ -401,7 +403,8 @@ comparison_plots <- as_tibble(colData(psce)) %>%
       scale_color_manual(values = condition_colors) +
       scale_y_continuous(limits = c(0, NA), expand = expansion(mult = c(0, 0.1)), n.breaks = 3) +
       coord_cartesian(clip = "off") +
-      ggh4x::facet_nested(~ gene + inside, labeller = labeller(inside =as_labeller( c("in" = "Inside", "out" = "Outside"))),
+      ggh4x::facet_nested(~ gene + inside, labeller = labeller(inside =as_labeller( c("in" = "Inside", "out" = "Outside")),
+                                                               gene = as_labeller(\(x) paste0("\\emph{", x, "}"))),
                           strip = ggh4x::strip_nested(clip = "off"))  +
       guides(x = guide_axis(angle = 90)) +
       theme(axis.title.x = element_blank(), axis.text = element_text(size = font_size_tiny),
@@ -712,7 +715,7 @@ plot_assemble(
   add_text("Diff. Gene", x = 70, y = 134.3, hjust = 0.5, vjust = 1, fontsize = font_size_small),
   add_plot(mc_biplot_diff, x = 47, y = 134, width = 42, height = 20),
    
-  add_text("(E) Predicted differential expression of HIST3H2A for each cell", x = 86.5, y = 111, vjust = 1, fontsize = font_size, fontface = "bold"),
+  add_text("(E) Predicted differential expression of \\emph{HIST3H2A} for each cell", x = 86.5, y = 111, vjust = 1, fontsize = font_size, fontface = "bold"),
   add_plot(de_plot, x = 85, y = 110, width = 60, height = 40),
   add_graphic("../illustrations/manual_divergent_colorscaleArtboard 1.pdf", x = 100,  y = 145, units = "mm"),
   add_text("down", x = 101, y = 146.9, vjust = 1, fontsize = font_size_small, hjust = 1),
@@ -721,7 +724,7 @@ plot_assemble(
   add_text("regulation", x = 125.5, y = 148.9, vjust = 1, fontsize = font_size_small, hjust = 0),
   add_plot(comparison_pl, x = 142, y = 113.5, width = 28, height = 37),
 
-  add_text("(F) Panobinostat stimulates LMO2 down-regulation in a subpopulation of tumor cells", x = 1.5, y = 158, vjust = 1, fontsize = font_size, fontface = "bold"),
+  add_text("(F) Panobinostat stimulates \\emph{LMO2} down-regulation in a subpopulation of tumor cells", x = 1.5, y = 158, vjust = 1, fontsize = font_size, fontface = "bold"),
   add_plot(de_plots2, x = 0, y = 160, width = 61, height = 40),
   add_graphic("../illustrations/manual_divergent_colorscaleArtboard 1.pdf", x = 15,  y = 196, units = "mm"),
   add_text("down", x = 16, y = 197.9, vjust = 1, fontsize = font_size_small, hjust = 1),
