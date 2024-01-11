@@ -175,7 +175,7 @@ jun_de_pl <- de_plot_data %>%
     scale_color_de_gradient(abs_max, mid_width = 0.2) +
     facet_grid(vars(inside), labeller = labeller(inside = as_labeller(c("in" = "Cells in Neighb.", "out" = "All other cells"))),
                switch="y") +
-    small_axis("UMAP", fontsize = font_size_small) +
+    small_axis("", fontsize = font_size_small) +
     theme(legend.position = "bottom", legend.margin = margin(t = -2, unit = "mm")) +
     guides(color = guide_colorbar(barheight = unit(1, "mm"), barwidth = unit(15, "mm"), title.vjust = 1)) +
     labs(color = "$\\Delta$")
@@ -214,12 +214,13 @@ plot_assemble(
   add_plot(cowplot::get_legend(spatial_plaq_dens_pl + theme(legend.text = element_text(size = font_size)) + labs(color = "")), x = 43, y = 1, height = 5),
   add_plot(spatial_plaq_dens_pl + guides(color = "none"), x = 0, y = 5, width = 60, height = 61),
   add_plot(umap_plt, x = 52, y = 5, width = 40, height = 61),
-  add_text("(E) Expression of \\emph{Jun} depends on the plaque density",
+  add_text("(E) \\emph{Jun} expression depends on the plaque density\n\\quad\\quad{}in a subset of cells",
            x = 95, y = 1, fontsize = font_size, vjust = 1, fontface = "bold"),
   add_text("Pred.~\\emph{Jun} diff.~expr.",
-           x = 97.5, y = 6.5, fontsize = 7, vjust = 1, fontface = "plain"),
+           x = 97.5, y = 8, fontsize = 7, vjust = 1, fontface = "plain"),
+  add_text("UMAP", x = 102.3, y = 58, fontsize = font_size_small, fontface = "plain"),
   add_plot(jun_de_pl, x = 95, y = 4.5, width = 25, height = 61.5),
-  add_plot(expr_comparison_pl + guides(color = "none") + theme(axis.text.x = element_blank()), x = 120, y = 5, width = 50, height = 30),
+  add_plot(expr_comparison_pl + guides(color = "none") + theme(axis.text.x = element_blank()), x = 120, y = 6.7, width = 50, height = 28.8),
   add_plot(rel_plt + guides(fill = "none"), x = 120, y = 34, width = 50, height = 26),
   add_plot(cowplot::get_legend(expr_comparison_pl), x = 125, y = 60, width = 60, height = 5),
   
