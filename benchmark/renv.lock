@@ -2144,6 +2144,19 @@
       "Repository": "CRAN",
       "Hash": "fcf11a91936fd5047b2ee9bc00595e36"
     },
+    "countsplit": {
+      "Package": "countsplit",
+      "Version": "4.0.0",
+      "Source": "Repository",
+      "Repository": "CRAN",
+      "Requirements": [
+        "Matrix",
+        "R",
+        "Rcpp",
+        "methods"
+      ],
+      "Hash": "e2b7e967aaefc56b6a87f5846a7fa8b5"
+    },
     "cowplot": {
       "Package": "cowplot",
       "Version": "1.1.1",
@@ -3908,19 +3921,6 @@
       ],
       "Hash": "e2817ccf4a065c5d9d7f2cfbe7c1d78c"
     },
-    "metapod": {
-      "Package": "metapod",
-      "Version": "1.6.0",
-      "Source": "Bioconductor",
-      "git_url": "https://git.bioconductor.org/packages/metapod",
-      "git_branch": "RELEASE_3_16",
-      "git_last_commit": "cfeaa95",
-      "git_last_commit_date": "2022-11-01",
-      "Requirements": [
-        "Rcpp"
-      ],
-      "Hash": "11e50591534d0c37308c8ddb56bf0ae0"
-    },
     "mgcv": {
       "Package": "mgcv",
       "Version": "1.8-42",
@@ -4206,6 +4206,17 @@
         "askpass"
       ],
       "Hash": "2a0dc8c6adfb6f032e4d4af82d258ab5"
+    },
+    "org.Hs.eg.db": {
+      "Package": "org.Hs.eg.db",
+      "Version": "3.16.0",
+      "Source": "Bioconductor",
+      "Requirements": [
+        "AnnotationDbi",
+        "R",
+        "methods"
+      ],
+      "Hash": "e22193c47c891d1a011dade7f262cc65"
     },
     "pals": {
       "Package": "pals",
@@ -5275,41 +5286,6 @@
       ],
       "Hash": "a272b0f2f06b3aa01fa4f5a033f0cf4a"
     },
-    "scran": {
-      "Package": "scran",
-      "Version": "1.26.2",
-      "Source": "Bioconductor",
-      "git_url": "https://git.bioconductor.org/packages/scran",
-      "git_branch": "RELEASE_3_16",
-      "git_last_commit": "0cdaef6",
-      "git_last_commit_date": "2023-01-19",
-      "Requirements": [
-        "BH",
-        "BiocGenerics",
-        "BiocParallel",
-        "BiocSingular",
-        "DelayedArray",
-        "DelayedMatrixStats",
-        "Matrix",
-        "Rcpp",
-        "S4Vectors",
-        "SingleCellExperiment",
-        "SummarizedExperiment",
-        "beachmat",
-        "bluster",
-        "dqrng",
-        "edgeR",
-        "igraph",
-        "limma",
-        "metapod",
-        "methods",
-        "scuttle",
-        "statmod",
-        "stats",
-        "utils"
-      ],
-      "Hash": "ab708ab1be42d035e6d8ef12b13ec4c9"
-    },
     "sctransform": {
       "Package": "sctransform",
       "Version": "0.4.0",
@@ -5718,18 +5694,6 @@
         "stats"
       ],
       "Hash": "6cffbce4f0fdc4b20a189939bab4ec89"
-    },
-    "statmod": {
-      "Package": "statmod",
-      "Version": "1.5.0",
-      "Source": "Repository",
-      "Repository": "CRAN",
-      "Requirements": [
-        "R",
-        "graphics",
-        "stats"
-      ],
-      "Hash": "26e158d12052c279bdd4ba858b80fb1f"
     },
     "stringfish": {
       "Package": "stringfish",
