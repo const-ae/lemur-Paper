@@ -96,6 +96,7 @@ cowplot::save_plot("../plots/suppl_zebrafish_cell_types.pdf", comb_cell_type_pl,
 
 
 
+
 ```{r}
 emb <- fit_subset$embedding
   
@@ -251,6 +252,36 @@ pred_plot2 <- pred_expr_df2 %>%
 pred_plot2
 ```
 
+
+
+
+
+```{r, paged.print=FALSE}
+kerat_expr_df <- as_tibble(colData(fit_subset)) %>%
+  mutate(timepoint_brackets = timepoint_brackets) %>%
+  mutate(umap = umaps$umap_all) %>%
+  mutate(expr = logcounts(fit_subset)["ENSDARG00000058358",]) %>%
+  filter(cell_type_broad == "periderm")
+  
+
+kerat_expr_pl <- ggplot(kerat_expr_df, aes(x = umap[,1], y = umap[,2])) +
+    ggrastr::rasterize(geom_point(aes(color = expr), size = 0.1, stroke = 0, show.legend = TRUE), dpi = 600) +
+    geom_point(data = tibble(umap = umaps$umap_inter2[sel_pos,], position = seq(0, 1, l = n_pos)), aes(fill = position), shape = 21, 
+               color = "black", size = 1.8, stroke = 0.2, show.legend = FALSE) +
+    colorspace::scale_fill_continuous_divergingx(palette = "Tropic", mid = 0.5) +
+    scale_color_gradient(low = "lightgrey", high = "#3d2892", limits = c(0, quantile(logcounts(fit_subset)["ENSDARG00000058358",], c(0.95))), oob = scales::oob_squish) +
+    facet_wrap(vars(timepoint_brackets), nrow = 1) +
+    small_axis(label = "UMAP", fontsize = font_size_small, 
+               xlim = scales::expand_range(quantile(kerat_expr_df$umap[,1], c(0.05, 0.95)), mul = 0.5),
+               ylim = scales::expand_range(quantile(kerat_expr_df$umap[,2], c(0.05, 0.95)), mul = 0.5)) +
+    labs(title = "Gene expression of \\emph{krt8} in the periderm over time")
+
+plot_assemble(
+  add_plot(kerat_expr_pl, x = 0, y = 1, width = 170, height = 50),
+  width = 170, height = 50, units = "mm", show_grid_lines = FALSE,
+  latex_support = TRUE, filename = "../plots/suppl_kerat_expr_plot.pdf"
+)
+```
 
 
 ```{r}
