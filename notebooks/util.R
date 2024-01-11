@@ -86,10 +86,10 @@ signif_to_zero <- function(x, digits = 6){
   n_signif_digits <- digits - ceiling(log10(abs(x)))
   sign(x) * floor(abs(x) * 10^n_signif_digits) / 10^n_signif_digits
 }
-scale_color_de_gradient <- function(abs_max, ..., oob = scales::squish, limits = c(-1, 1) * abs_max, breaks = c(-1, 0, 1) * signif_to_zero(abs_max, 1), mid_width = 0.1){
+scale_color_de_gradient <- function(abs_max, mid_width = 0.1, ..., oob = scales::squish, limits = c(-1, 1) * abs_max, breaks = c(-1, 0, 1) * signif_to_zero(abs_max, 1)){
   colors <- c(scales::muted("blue"), "lightgrey", "lightgrey", scales::muted("red"))
   values <- c(0, 0.5 - mid_width/2, 0.5 + mid_width/2, 1)
-  scale_color_gradientn(oob = oob, limits = limits, breaks = breaks, colors = colors, values = values)
+  scale_color_gradientn(oob = oob, limits = limits, breaks = breaks, colors = colors, values = values, ...)
 }
 
 ######### Custom plotting functions #########

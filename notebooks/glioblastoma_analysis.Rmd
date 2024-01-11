@@ -112,6 +112,8 @@ chr_ratio_pl <- colData(fit_small) %>%
     coord_cartesian(xlim = c(0, 2.5)) +
     labs(y = "No. cells") +
     theme(axis.title.x = element_blank(), axis.text.y = element_blank(), axis.ticks.y = element_blank())
+
+chr_ratio_pl
 ```
 
 
@@ -280,7 +282,8 @@ de_plots <- de_plot_data %>%
     data$gene <- key[[1]][1]
     ggplot(data, aes(x = umap[,1], y = umap[,2])) +
       ggrastr::rasterise(geom_point(aes(color = de), size = 0.05, stroke = 0), dpi = 600) +
-      scale_colour_gradient2_rev(limits = c(-1, 1) * abs_max, oob = scales::squish, breaks = c(-1, 0, 1) * signif_to_zero(abs_max, 1), mid = "lightgrey") +
+      # scale_colour_gradient2_rev(limits = c(-1, 1) * abs_max, oob = scales::squish, breaks = c(-1, 0, 1) * signif_to_zero(abs_max, 1), mid = "lightgrey") +
+      scale_color_de_gradient(abs_max, mid_width = 0.2) +
       facet_grid(vars(inside), vars(gene), labeller = labeller(inside =as_labeller( c("in" = "Cells in Neighb.", "out" = "All other cells")),
                                                                gene = as_labeller(\(x) paste0("\\emph{", x, "}"))), switch = "y")  +
       scale_x_continuous(limits = range(umap_fit[,1]) * 1.1) +
@@ -293,13 +296,12 @@ de_plots <- de_plot_data %>%
 
 de_plots
 
-
 de_plot_data_hist3h2a <- de_plot_data %>%
   filter(gene == "HIST3H2A")
 abs_max <- max(abs(quantile(de_plot_data_hist3h2a$de, c(0.95, 0.05))))
 de_plot <- ggplot(de_plot_data_hist3h2a, aes(x = umap[,1], y = umap[,2])) +
     ggrastr::rasterise(geom_point(aes(color = de), size = 0.05, stroke = 0), dpi = 600) +
-    scale_colour_gradient2_rev(limits = c(-1, 1) * abs_max, oob = scales::squish, breaks = c(-1, 0, 1) * signif_to_zero(abs_max, 1), mid = "lightgrey") +
+    scale_color_de_gradient(abs_max, mid_width = 0.2) +
     facet_wrap(vars(inside), nrow = 1, labeller = as_labeller(c("in" = "Cells in Neighborhood", "out" = "All other cells")))  +
     scale_x_continuous(limits = range(umap_fit[,1]) * 1.1) +
     scale_y_continuous(limits = range(umap_fit[,2]) * 1.1) +
@@ -436,7 +438,7 @@ comparison_pl <- as_tibble(colData(psce)) %>%
     scale_y_continuous(limits = c(0, NA), expand = expansion(mult = c(0, 0.2)), n.breaks = 3) +
     coord_cartesian(clip = "off") +
     # guides(x = guide_axis(angle = 90)) +
-    labs(subtitle = "Pseudobulked expr. of\ncells in neighb.") +
+    labs(subtitle = "Pseudobulked expr. of\ncells in neighborhood") +
     theme(axis.title = element_blank(), plot.subtitle = element_text(size = font_size_small))
 
 comparison_pl
@@ -486,7 +488,8 @@ de_plots2 <- de_plot_data2 %>%
   mutate(de = ifelse(cell_type == "Tumor cells", de, NA)) %>%
   ggplot(aes(x = umap[,1], y = umap[,2])) +
     ggrastr::rasterise(geom_point(aes(color = de), size = 0.05, stroke = 0), dpi = 600) +
-    scale_colour_gradient2_rev(limits = c(-1, 1) * abs_max, oob = scales::squish, breaks = c(-1, 0, 1) * signif_to_zero(abs_max, 1), mid = "lightgrey", na.value = "#00000000") +
+    # scale_colour_gradient2_rev(limits = c(-1, 1) * abs_max, oob = scales::squish, breaks = c(-1, 0, 1) * signif_to_zero(abs_max, 1), mid = "lightgrey", na.value = "#00000000") +
+    scale_color_de_gradient(abs_max, mid_width = 0.2, na.value = "#00000000") +
     facet_wrap(vars(inside), nrow = 1, labeller = as_labeller(c("in" = "Cells in Neighborhood", "out" = "Other tumor cells")))  +
     scale_x_continuous(limits = range(umap_fit[,1]) * 1.1) +
     scale_y_continuous(limits = range(umap_fit[,2]) * 1.1) +
@@ -737,7 +740,7 @@ plot_assemble(
   add_text("regulation", x = 125.5, y = 148.9, vjust = 1, fontsize = font_size_small, hjust = 0),
   add_plot(comparison_pl, x = 142, y = 113.5, width = 28, height = 37),
 
-  add_text("(F) Panobinostat stimulates \\emph{LMO2} down-regulation in a subpopulation of tumor cells", x = 1.5, y = 158, vjust = 1, fontsize = font_size, fontface = "bold"),
+  add_text("(F) Panobinostat down-regulates \\emph{LMO2} in a subpopulation of tumor cells", x = 1.5, y = 158, vjust = 1, fontsize = font_size, fontface = "bold"),
   add_plot(de_plots2 + guides(color = "none"), x = 0, y = 160, width = 61, height = 40),
   add_plot(lmo2_legend, x = 16.5, y = 198, width = 30, height = 5),
   add_text("down", x = 16, y = 197.9, vjust = 1, fontsize = font_size_small, hjust = 1),

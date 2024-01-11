@@ -432,8 +432,8 @@ de_pred_pl <- as_tibble(colData(lemur_fit)) %>%
   mutate(de_pred = assay(lemur_fit, "DE")[sel_gene,]) %>%
   ggplot(aes(x = umap[,1], y = umap[,2])) +
     ggrastr::rasterize(geom_point(aes(color = de_pred), size = 0.05, stroke = 0), dpi = 600) +
-    scale_colour_gradient2_rev(limits = c(-2.5, 2.5), oob = scales::oob_squish, breaks = c(-2, 0, 2)) +
-    # scale_color_gradient2() +
+    # scale_colour_gradient2_rev(limits = c(-2.5, 2.5), oob = scales::oob_squish, breaks = c(-2, 0, 2), mid = "lightgrey") +
+    scale_color_de_gradient(limits = c(-2.5, 2.5), breaks = c(-2, 0, 2), mid_width = 0.2) +
     small_axis(label = "UMAP", fontsize = font_size_small) +
     labs(#title = "(G) Predicted DE + Neighborhood", 
          color = "$\\Delta$") +

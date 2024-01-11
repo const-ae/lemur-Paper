@@ -164,14 +164,15 @@ de_plot_data <- as_tibble(colData(fit), rownames = "cell_id") %>%
   inner_join(is_inside, by = c("symbol", "cell_id")) %>%
   sample_frac(size = 1) 
 
-abs_max <- max(abs(quantile(de_plot_data$de, c(0.9, 0.1))))
+abs_max <- max(abs(quantile(de_plot_data$de, c(0.95, 0.05))))
 
 jun_de_pl <- de_plot_data %>%
   mutate(inside = ifelse(inside, "in", "out")) %>%
   mutate(inside = factor(inside, levels = c("in", "out")))  %>%
   ggplot(aes(x = umap[,2], y = umap[,1])) +
     ggrastr::rasterise(geom_point(aes(color = de), size = 0.05, stroke = 0), dpi = 600) +
-    scale_colour_gradient2_rev(limits = c(-1, 1) * abs_max, oob = scales::squish, breaks = c(-1, 0, 1) * signif_to_zero(abs_max, 1), mid = "lightgrey") +
+    # scale_colour_gradient2_rev(limits = c(-1, 1) * abs_max, oob = scales::squish, breaks = c(-1, 0, 1) * signif_to_zero(abs_max, 1), mid = "lightgrey") +
+    scale_color_de_gradient(abs_max, mid_width = 0.2) +
     facet_grid(vars(inside), labeller = labeller(inside = as_labeller(c("in" = "Cells in Neighb.", "out" = "All other cells"))),
                switch="y") +
     small_axis("UMAP", fontsize = font_size_small) +
