@@ -43,6 +43,58 @@ time_course_pl <- as_tibble(colData(fit_subset)) %>%
 time_course_pl
 ```
 
+```{r, paged.print=FALSE}
+set.seed(1)
+celltype_broad_plt <- as_tibble(colData(fit_subset)) %>%
+  mutate(umap = umaps$umap_all) %>%
+  mutate(tissue_mod = case_when(
+    tissue == "Epidermis" ~ cell_type_broad,
+    TRUE ~ tissue
+  )) %>%
+  mutate(cell_type_label = tissue_mod) %>%
+  mutate(cell_type_label = fct_lump_n(cell_type_label, n = 10)) %>%
+  ggplot(aes(x = umap[,1], y = umap[,2])) +
+    ggrastr::rasterize(geom_point(aes(color = cell_type_label), size = 0.01, stroke = 0, show.legend = FALSE), dpi = 600) +
+    ggrepel::geom_text_repel(data = . %>% summarize(umap = matrix(colMedians(umap), nrow = 1), .by = cell_type_label), 
+                              aes(label = cell_type_label), size = font_size_tiny / .pt, show.legend = FALSE, max.overlaps = 100) +
+    scale_x_continuous(limits = range(umaps$umap_all[,2])) +
+    small_axis(label = "UMAP", fontsize = font_size_small,
+                xlim = scales::expand_range(quantile(umaps$umap_all[,1], c(0.01, 0.99)), mul = 0)) +
+    labs(title = "(A) Zebrafish: tissue labels plus zoom in on cell types in central nervous system and periderm") 
+
+celltype_specific_plt <- as_tibble(colData(fit_subset)) %>%
+  mutate(umap = umaps$umap_all) %>%
+  mutate(split_label = case_when(
+    cell_type_broad == "periderm" ~ "Periderm",
+    tissue == "Central Nervous System" ~ "Central Nervous System",
+    TRUE ~ "Other"
+  )) %>%
+  filter(split_label != "Other") %>%
+  mutate(cell_type_label = cell_type_sub) %>%
+  group_by(split_label) %>%
+  group_map(\(data, key){
+    y_mult <- if(key[[1]][1] == "Central Nervous System") 0.2 else 0.5
+    x_mult <- if(key[[1]][1] == "Central Nervous System") 0.2 else 0.5
+    data %>%
+      mutate(split_label = key[[1]][1]) %>%
+      mutate(cell_type_label = fct_lump_n(cell_type_label, n = 6)) %>%
+      ggplot(aes(x = umap[,1], y = umap[,2])) +
+        ggrastr::rasterize(geom_point(aes(color = cell_type_label), size = 0.01, stroke = 0, show.legend = FALSE), dpi = 600) +
+        ggrepel::geom_text_repel(data = . %>% summarize(umap = matrix(colMedians(umap), nrow = 1), .by = c(split_label, cell_type_label)), 
+                                  aes(label = stringr::str_wrap(cell_type_label, 20)), size = font_size_tiny / .pt, 
+                                 max.overlaps = 20, box.padding = 0.5, show.legend = FALSE) +
+        facet_wrap(vars(split_label)) +
+        small_axis(label = "UMAP", fontsize = font_size_small, 
+                   xlim = scales::expand_range(quantile(data$umap[,1], c(0.05, 0.95)), mul = x_mult),
+                   ylim = scales::expand_range(quantile(data$umap[,2], c(0.05, 0.95)), mul = y_mult))
+  }) %>%
+  cowplot::plot_grid(plotlist = ., nrow = 1, rel_widths = c(1, 0.5))
+
+comb_cell_type_pl <- cowplot::plot_grid(celltype_broad_plt, celltype_specific_plt, nrow = 1, rel_widths = c(1.1, 2))
+cowplot::save_plot("../plots/suppl_zebrafish_cell_types.pdf", comb_cell_type_pl, base_height = 8, base_width = 17, units = "cm", ncol = 1)
+```
+
+
 
 ```{r}
 emb <- fit_subset$embedding
@@ -68,13 +120,16 @@ sel_pos <- seq(1, nrow(umaps$umap_inter1), l = n_pos)
 umap_pl <- as_tibble(colData(fit_subset)) %>%
   mutate(umap = umaps$umap_all) %>%
   ggplot(aes(x = umap[,1], y = umap[,2])) +
-    ggrastr::rasterize(geom_point(size = 0.1, stroke = 0, color = "grey85"), dpi = 600) +
-    geom_point(data = tibble(umap = umaps$umap_inter1[sel_pos,], position = seq(0, 1, l = n_pos)), aes(fill = position), shape = 21, color = "black", size = 0.8, stroke = 0.1) +
+    annotate(geom = "text", x = -5, y = 5, label = "Central nervous system", size = font_size_small / .pt) +
+    annotate(geom = "text", x = 8, y = 6, label = "Periderm", size = font_size_small / .pt) +
+    ggrastr::rasterize(geom_point(size = 0.2, stroke = 0, color = "grey85"), dpi = 600) +
+    geom_point(data = tibble(umap = umaps$umap_inter1[sel_pos,], position = seq(0, 1, l = n_pos)), aes(fill = position), shape = 21, color = "black", size = 1.3, stroke = 0.1) +
     colorspace::scale_fill_continuous_divergingx(palette = "Zissou1", mid = 0.5) +
     ggnewscale::new_scale_fill() +
-    geom_point(data = tibble(umap = umaps$umap_inter2[sel_pos,], position = seq(0, 1, l = n_pos)), aes(fill = position), shape = 21, color = "black", size = 0.8, stroke = 0.1) +
+    geom_point(data = tibble(umap = umaps$umap_inter2[sel_pos,], position = seq(0, 1, l = n_pos)), aes(fill = position), shape = 21, color = "black", size = 1.3, stroke = 0.1) +
     colorspace::scale_fill_continuous_divergingx(palette = "Tropic", mid = 0.5) +
-    small_axis(label = "UMAP")
+    small_axis(label = "UMAP") 
+
 umap_pl
 ```
 
@@ -125,14 +180,16 @@ pred_plot <- pred_expr_df %>%
               aes(label = label), x = 36.5, y = 2, hjust = 0, vjust = 0.5, size = font_size_tiny / .pt) +
     geom_segment(data = tibble(x = 36, y = 1.5, xend = 35, yend = 0.758, gene_short_name = "iqsec1b"),
                  aes(x = x, y = y, xend = xend, yend = yend)) +
-    facet_wrap(vars(gene_short_name), scales = "fixed", labeller = as_labeller(\(x)glue("\\emph{{{x}}}"))) +
+    facet_wrap(vars(gene_short_name), scales = "free_y", labeller = as_labeller(\(x)glue("\\emph{{{x}}}"))) +
     scale_y_continuous(expand = expansion(mult = c(0, 0.1)), limits = c(0, 3)) +
     scale_x_continuous(breaks = c(18, 24, 30, 36, 42, 48)) +
     # coord_cartesian(clip = "off") +
     colorspace::scale_fill_continuous_divergingx(palette = "Zissou1", mid = 0.5) +
     colorspace::scale_color_continuous_divergingx(palette = "Zissou1", mid = 0.5) +
     guides(fill = "none") +
-    labs(y = "Expression", x = "Hours post fertilization")
+    labs(y = "Expression", x = "Hours post fertilization",
+         subtitle = "Central Nervous System") +
+    theme(plot.subtitle = element_text(size = font_size_small, margin = margin(t = 0, unit = "mm")))
 
 pred_plot
 ```
@@ -174,17 +231,22 @@ obs_expr_df2 <- obs_gene_expr2 %>%
 
 pred_plot2 <- pred_expr_df2 %>%
   filter(gene_short_name %in% periderm_genes[c(2,3)]) %>%
+  filter(pred < 2.2) %>%
   ggplot(aes(x = timepoint, y = pred)) +
     geom_line(aes(color = origin, group = as.factor(origin))) +
     geom_point(data = obs_expr_df2 %>% summarize(timepoint = median(timepoint), expr = mean(expr), .by = c(gene_short_name, timepoint_br, origin)),
                aes(y = expr, fill = origin), shape = 21, color = "black", size = 2) +
-    facet_wrap(vars(gene_short_name), scales = "fixed", labeller = as_labeller(\(x)glue("\\emph{{{x}}}"))) +
+    geom_blank(data = tibble(timepoint = 30, pred = 1)) +
+    facet_wrap(vars(gene_short_name), scales = "free_y", labeller = as_labeller(\(x)glue("\\emph{{{x}}}"))) +
     scale_x_continuous(breaks = c(18, 24, 30, 36, 42, 48)) +
-    scale_y_continuous(expand = expansion(mult = c(0, 0)), limits = c(0, 2.2)) +
+    # scale_y_continuous(expand = expansion(mult = c(0, 0)), limits = c(0, 2.2)) +
+    scale_y_continuous(expand = expansion(mult = c(0, 0))) +
     colorspace::scale_fill_continuous_divergingx(palette = "Tropic", mid = 0.5) +
     colorspace::scale_color_continuous_divergingx(palette = "Tropic", mid = 0.5) +
     guides(fill = "none") +
-    labs(y = "Expression", x = "Hours post fertilization")
+    labs(y = "Expression", x = "Hours post fertilization",
+         subtitle = "Periderm") +
+    theme(plot.subtitle = element_text(size = font_size_small, margin = margin(t = 0, unit = "mm")))
 
 pred_plot2
 ```
@@ -199,8 +261,8 @@ plot_assemble(
   add_plot(umap_pl + theme(legend.position = "none"), x = 0, y = 56, width = 60, height = 57),
   add_text("(C) Predicted interactions between time and coordinates in latent space",
            x = 62.7, y = 53, fontsize = font_size, vjust = 1, fontface = "bold"),
-  add_plot(pred_plot + theme(legend.position = "none"), x = 60, y = 58, width = 110, height = 28.5),
-  add_plot(pred_plot2  + theme(legend.position = "none"), x = 60, y = 58+28.5, width = 110, height = 28.5),
+  add_plot(pred_plot + theme(legend.position = "none"), x = 60, y = 56, width = 110, height = 30.5),
+  add_plot(pred_plot2  + theme(legend.position = "none"), x = 60, y = 55+30.5, width = 110, height = 30.5),
 
   width = 170, height = 116, units = "mm", show_grid_lines = FALSE,
   latex_support = TRUE, filename = "../plots/continuous_covar_figure.pdf"
