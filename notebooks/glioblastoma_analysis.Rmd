@@ -219,15 +219,6 @@ umap_orig_pc_pl
 ```
 
 
-```{r}
-signif_to_zero <- function(x, digits = 6){
-  n_signif_digits <- digits - ceiling(log10(abs(x)))
-  sign(x) * floor(abs(x) * 10^n_signif_digits) / 10^n_signif_digits
-}
-
-signif_to_zero(-12.39, digits = 3)
-```
-
 
 ```{r, paged.print=FALSE}
 scale_sym <- function(x, ignore_extreme = 0){

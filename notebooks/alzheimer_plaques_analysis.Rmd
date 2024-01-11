@@ -150,11 +150,6 @@ expr_comparison_pl
 
 
 ```{r, paged.print=FALSE}
-signif_to_zero <- function(x, digits = 6){
-  n_signif_digits <- digits - ceiling(log10(abs(x)))
-  sign(x) * floor(abs(x) * 10^n_signif_digits) / 10^n_signif_digits
-}
-
 is_inside <- tibble(symbol = genes_of_interest, cell_id = list(colnames(fit))) %>%
   left_join(dplyr::select(nei, name, neighborhood), by = c("symbol"= "name")) %>%
   mutate(inside = map2(cell_id, neighborhood, \(ref, nei_cells) ref %in% nei_cells)) %>%

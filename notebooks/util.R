@@ -79,9 +79,19 @@ small_arrow <- function(position = c(0.8, 0.95), offset = 0.01, label = NULL, di
   list(arrow, text)
 }
 
-scale_colour_gradient2_rev <- function(..., low = scales::muted("blue"), mid = "white", high = scales::muted("red")){
-  scale_color_gradient2(..., low = low, mid = mid, high = high)
+# scale_colour_gradient2_rev <- function(..., low = scales::muted("blue"), mid = "white", high = scales::muted("red")){
+#   scale_color_gradient2(..., low = low, mid = mid, high = high)
+# }
+signif_to_zero <- function(x, digits = 6){
+  n_signif_digits <- digits - ceiling(log10(abs(x)))
+  sign(x) * floor(abs(x) * 10^n_signif_digits) / 10^n_signif_digits
 }
+scale_color_de_gradient <- function(abs_max, ..., oob = scales::squish, limits = c(-1, 1) * abs_max, breaks = c(-1, 0, 1) * signif_to_zero(abs_max, 1), mid_width = 0.1){
+  colors <- c(scales::muted("blue"), "lightgrey", "lightgrey", scales::muted("red"))
+  values <- c(0, 0.5 - mid_width/2, 0.5 + mid_width/2, 1)
+  scale_color_gradientn(oob = oob, limits = limits, breaks = breaks, colors = colors, values = values)
+}
+
 ######### Custom plotting functions #########
 
 convert_dims <- function( width, height, units = c("inches", "in", "cm", "mm", "px"), dpi = 300, scale = 1){
