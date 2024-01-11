@@ -82,6 +82,29 @@ umap_plt <- as_tibble(colData(fit)) %>%
 umap_plt
 ```
 
+Make cell type plot
+
+```{r}
+table(fit$colData$cell_type_lumped, fit$colData$cell_type, useNA = "always")
+```
+
+
+```{r, paged.print=FALSE}
+celltype_broad_plt <- as_tibble(colData(fit)) %>%
+  mutate(umap = umap) %>%
+  ggplot(aes(x = umap[,2], y = umap[,1])) +
+    ggrastr::rasterize(geom_point(aes(color = cell_type_lumped), size = 0.1, stroke = 0, show.legend = FALSE), dpi = 600) +
+    ggrepel::geom_label_repel(data = . %>% summarize(umap = matrix(colMedians(umap), nrow = 1), .by = cell_type_lumped), 
+                              aes(label = cell_type_lumped, color = cell_type_lumped), size = font_size_small / .pt, show.legend = FALSE, max.overlaps = 100) +
+    scale_x_continuous(limits = range(umap[,2]) * 1.5) +
+    small_axis(label = "UMAP", fontsize = font_size_small) +
+    labs(title = "(B) Mouse hypocampus: broad cell type labels") 
+```
+
+```{r}
+cowplot::save_plot("../plots/suppl_alzheimer_cell_types.pdf", celltype_broad_plt, base_height = 8, base_width = 8, units = "cm")
+```
+
 
 
 ```{r, paged.print=FALSE}
@@ -114,7 +137,7 @@ expr_comparison_pl <- comparison_data %>%
   ggplot(aes(x = plaque_cluster, y = expr)) +
     geom_point(aes(color = origin), size = 0.3) +
     geom_smooth(aes(color = origin, x = as.integer(plaque_cluster)), span = 1.5, se = FALSE, linewidth = 2) +
-    scale_color_manual(values = c("inside" = "black", "outside" = "lightgrey")) +
+    scale_color_manual(values = c("inside" = "black", "outside" = "lightgrey"), labels = c("inside" = "Cells in neighborhood", "outside" = "All other cells")) +
     scale_y_continuous(limits = c(0, 0.3), expand = expansion(add = 0)) +
     guides(x = guide_axis(angle = 45)) +
     theme(axis.title.x = element_blank(), legend.position = "bottom") +
@@ -127,9 +150,9 @@ expr_comparison_pl
 
 
 ```{r, paged.print=FALSE}
-scale_sym <- function(x, ignore_extreme = 0){
-  abs_max <- max(abs(quantile(x, c(ignore_extreme, 1-ignore_extreme))))
-  x / abs_max
+signif_to_zero <- function(x, digits = 6){
+  n_signif_digits <- digits - ceiling(log10(abs(x)))
+  sign(x) * floor(abs(x) * 10^n_signif_digits) / 10^n_signif_digits
 }
 
 is_inside <- tibble(symbol = genes_of_interest, cell_id = list(colnames(fit))) %>%
@@ -144,8 +167,6 @@ de_plot_data <- as_tibble(colData(fit), rownames = "cell_id") %>%
   unnest(de, names_sep = "-") %>%
   pivot_longer(starts_with("de-"), names_sep = "-", values_to = "de", names_to = c(NA, "symbol")) %>%
   inner_join(is_inside, by = c("symbol", "cell_id")) %>%
-  group_by(symbol) %>%
-  # mutate(de = scale_sym(de, ignore_extreme = 0.05)) %>%
   sample_frac(size = 1) 
 
 abs_max <- max(abs(quantile(de_plot_data$de, c(0.9, 0.1))))
@@ -155,13 +176,12 @@ jun_de_pl <- de_plot_data %>%
   mutate(inside = factor(inside, levels = c("in", "out")))  %>%
   ggplot(aes(x = umap[,2], y = umap[,1])) +
     ggrastr::rasterise(geom_point(aes(color = de), size = 0.05, stroke = 0), dpi = 600) +
-    # scale_colour_gradient2_rev(limits = c(-1, 1), oob = scales::squish, breaks = c(-1, 0, 1), na.value = "#00000000") +
-    scale_colour_gradient2_rev(limits = c(-1, 1) * signif(abs_max, 1), oob = scales::squish, breaks = c(-1, 0, 1) * signif(abs_max, 1)) +
-    facet_grid(vars(inside), labeller = labeller(inside = as_labeller(c("in" = "Inside Neighb.", "out" = "Outside Neighb."))),
+    scale_colour_gradient2_rev(limits = c(-1, 1) * abs_max, oob = scales::squish, breaks = c(-1, 0, 1) * signif_to_zero(abs_max, 1), mid = "lightgrey") +
+    facet_grid(vars(inside), labeller = labeller(inside = as_labeller(c("in" = "Cells in Neighb.", "out" = "All other cells"))),
                switch="y") +
     small_axis("UMAP", fontsize = font_size_small) +
     theme(legend.position = "bottom", legend.margin = margin(t = -2, unit = "mm")) +
-    guides(color = guide_colorbar(barheight = unit(1, "mm"), barwidth = unit(10, "mm"), title.vjust = 1)) +
+    guides(color = guide_colorbar(barheight = unit(1, "mm"), barwidth = unit(15, "mm"), title.vjust = 1)) +
     labs(color = "$\\Delta$")
 
 jun_de_pl
@@ -205,7 +225,10 @@ plot_assemble(
   add_plot(jun_de_pl, x = 95, y = 4.5, width = 25, height = 61.5),
   add_plot(expr_comparison_pl + guides(color = "none") + theme(axis.text.x = element_blank()), x = 120, y = 5, width = 50, height = 30),
   add_plot(rel_plt + guides(fill = "none"), x = 120, y = 34, width = 50, height = 26),
-  add_plot(cowplot::get_legend(expr_comparison_pl), x = 135, y = 60, width = 60, height = 5),
+  add_plot(cowplot::get_legend(expr_comparison_pl), x = 125, y = 60, width = 60, height = 5),
+  
+  add_graphic("../plots/schematic_elements/alzheimer_circle.pdf", x = -1,  y = -1, units = "mm"),
+  
   width = 170, height = 65, units = "mm", show_grid_lines = FALSE,
   latex_support = TRUE, filename = "../plots/continuous_covar_figure_part2.pdf"
 )
