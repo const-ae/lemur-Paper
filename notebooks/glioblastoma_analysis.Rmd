@@ -105,7 +105,7 @@ chr_ratio_pl <- colData(fit_small) %>%
   mutate(is_tumor = cell_type == "Tumor cells") %>%
   ggplot(aes(x = ratio)) +
     geom_histogram(aes(fill = is_tumor), position = "identity", alpha = 0.7, show.legend = FALSE, bins = 500) +
-    facet_wrap(vars(origin), nrow = 1, labeller = as_labeller(c(chr_10_ratio = "Chr.~10 Ratio", chr_7_ratio = "Chr.~7 Ratio"))) +
+    facet_wrap(vars(origin), nrow = 1, labeller = as_labeller(c(chr_10_ratio = "Chr.~10 Ratio", chr_7_ratio = "Chr.~7 Ratio")), scales = "free_y") +
     scale_y_continuous(expand = expansion(0)) +
     scale_x_continuous(expand = expansion(0), breaks = c(0, 1, 2)) +
     scale_fill_manual(values = c("TRUE" = unname(cell_type_colors["Tumor cells"]), "FALSE" = "#888888")) +
