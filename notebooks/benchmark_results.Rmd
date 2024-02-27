@@ -421,7 +421,8 @@ de_expr_pl <- as_tibble(colData(lemur_fit)) %>%
   mutate(inside = colnames(lemur_fit) %in% nei$neighborhood[[sel_gene]]) %>%
   ggplot(aes(x = umap[,1], y = umap[,2])) +
     ggrastr::rasterize(geom_point(aes(color = expr), size = 0.1, stroke = 0), dpi = 600) +
-    scale_color_viridis_c() +
+    # scale_color_viridis_c() +
+    colorspace::scale_color_continuous_sequential(limits = c(0, quantile(assay(lemur_fit, "logcounts")[sel_gene,], c(0.98))), oob = scales::oob_squish, palette = "Purples 2", n.breaks = 3) +
     small_axis(label = "", fontsize = font_size_small, arrow_length = 5) +
     labs(title = "", color = "Expr.") +
     facet_wrap(vars(fake_condition), ncol = 1, labeller = as_labeller(c("fake_ctrl" = "Ctrl.", "fake_trt" = "Trt."))) +
@@ -646,7 +647,7 @@ power_per_desize_plot <- power_per_desize %>%
     scale_x_log10(limits = c(50, NA), labels = scales::label_comma()) +
     scale_y_continuous(expand = expansion(add = c(0, 10)), breaks = c(0, 100, 200)) +
     labs(title = "(K) Power by no. cell with expr. change",
-         subtitle = "Fraction of simulated genes (\\textcolor{gray!60!black}{grey}) with $\\min \\textrm{FDR}_{g:} < 0.1$ (\\textcolor{blue!60!black}{blue})",
+         subtitle = "Fraction of simulated genes (\\textcolor{gray!60!black}{grey}) with $\\textrm{FDR} < 0.1$ (\\textcolor{blue!60!black}{blue})",
          x = "No. cells with expr. change (log scale)", y = "No. genes") +
     theme(plot.title.position = "plot")
 

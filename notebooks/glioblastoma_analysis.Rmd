@@ -194,26 +194,26 @@ make_dim_pl <- function(red_dim, color_by = NULL, axis_label = ""){
     sample_frac(n = 1) %>%
     ggplot(aes(x = umap[,1], y = umap[,2])) +
       ggrastr::rasterize(geom_point(aes(color = {{color_by}}), size = 0.02, stroke = 0, show.legend = FALSE), dpi = 600) +
-      small_axis(label = axis_label)
+      small_axis(label = axis_label, arrow_length = if(axis_label != "") 10 else 5)
 }
 
 
 
-umap_orig_ct_pl <- make_dim_pl("UMAP", color_by = cell_type, axis_label = "UMAP") +
+umap_orig_ct_pl <- make_dim_pl("UMAP", color_by = cell_type, axis_label = "") +
   scale_color_manual(values = cell_type_colors)
 umap_orig_pc_pl <- make_dim_pl("UMAP", color_by = condition, axis_label = "UMAP") +
-  geom_text(data = . %>% filter(cell_type == "Tumor cells") %>% summarize(umap = matrix(colMedians(umap), nrow = 1), .by = patient_id),
+  ggrepel::geom_text_repel(data = . %>% filter(cell_type == "Tumor cells") %>% summarize(umap = matrix(colMedians(umap), nrow = 1), .by = patient_id),
             aes(label = patient_id), size = font_size_tiny / .pt) +
   scale_color_manual(values = condition_colors)
 
-umap_fit_ct_pl <- make_dim_pl("fit_umap", color_by = cell_type, axis_label = "UMAP") +
+umap_fit_ct_pl <- make_dim_pl("fit_umap", color_by = cell_type, axis_label = "") +
   scale_color_manual(values = cell_type_colors)
-umap_fit_pc_pl <- make_dim_pl("fit_umap", color_by = condition, axis_label = "UMAP") +
+umap_fit_pc_pl <- make_dim_pl("fit_umap", color_by = condition, axis_label = "") +
   scale_color_manual(values = condition_colors)
 
-umap_fital_ct_pl <- make_dim_pl("fit_al_umap", color_by = cell_type, axis_label = "UMAP") +
+umap_fital_ct_pl <- make_dim_pl("fit_al_umap", color_by = cell_type, axis_label = "") +
   scale_color_manual(values = cell_type_colors)
-umap_fital_pc_pl <-make_dim_pl("fit_al_umap", color_by = condition, axis_label = "UMAP") +
+umap_fital_pc_pl <-make_dim_pl("fit_al_umap", color_by = condition, axis_label = "") +
   scale_color_manual(values = condition_colors)
 
 umap_orig_ct_pl
@@ -299,15 +299,25 @@ de_plots
 de_plot_data_hist3h2a <- de_plot_data %>%
   filter(gene == "HIST3H2A")
 abs_max <- max(abs(quantile(de_plot_data_hist3h2a$de, c(0.95, 0.05))))
-de_plot <- ggplot(de_plot_data_hist3h2a, aes(x = umap[,1], y = umap[,2])) +
+
+de_plot_full <- ggplot(de_plot_data_hist3h2a, aes(x = umap[,1], y = umap[,2])) +
     ggrastr::rasterise(geom_point(aes(color = de), size = 0.05, stroke = 0), dpi = 600) +
     scale_color_de_gradient(abs_max, mid_width = 0.2) +
-    facet_wrap(vars(inside), nrow = 1, labeller = as_labeller(c("in" = "Cells in Neighborhood", "out" = "All other cells")))  +
     scale_x_continuous(limits = range(umap_fit[,1]) * 1.1) +
     scale_y_continuous(limits = range(umap_fit[,2]) * 1.1) +
     small_axis(label = "", fontsize = font_size_tiny, xlim = range(umap_fit[,1]), ylim = range(umap_fit[,2]), arrow_length = 3) +
     theme(legend.position = "bottom")
-de_plot
+de_plot_full
+
+de_plot_split <- ggplot(de_plot_data_hist3h2a, aes(x = umap[,1], y = umap[,2])) +
+    ggrastr::rasterise(geom_point(aes(color = de), size = 0.05, stroke = 0), dpi = 600) +
+    scale_color_de_gradient(abs_max, mid_width = 0.2) +
+    facet_wrap(vars(inside), ncol = 1, labeller = as_labeller(c("in" = "Cells in Neighborhood", "out" = "All other cells")))  +
+    scale_x_continuous(limits = range(umap_fit[,1]) * 1.1) +
+    scale_y_continuous(limits = range(umap_fit[,2]) * 1.1) +
+    small_axis(label = "", fontsize = font_size_tiny, xlim = range(umap_fit[,1]), ylim = range(umap_fit[,2]), arrow_length = 3) +
+    theme(legend.position = "bottom")
+de_plot_split
 ```
 
 
@@ -686,7 +696,7 @@ condition_legend <- ggplot(enframe(condition_colors) %>% filter(name != "etoposi
   theme(legend.position = "left", legend.title = element_text(size = font_size))
 
 hist3h2a_legend <- cowplot::get_legend({
-  de_plot +
+  de_plot_full +
     guides(color = guide_colorbar(title = "", label.theme = element_text(size = font_size_tiny, margin = margin(t = 0 , unit = "mm")), 
                                  barheight = unit(1.5, "mm"), barwidth = unit(23, "mm")))
 })
@@ -726,13 +736,14 @@ plot_assemble(
   add_plot(chr_ratio_pl, x = 7, y = 144, width = 40, height = 13),
 
   add_text("(D) Multi-condition biplot", x = 49, y = 111, vjust = 1, fontsize = font_size, fontface = "bold"),
-  add_text("Marker Genes", x = 70, y = 114.3, hjust = 0.5, vjust = 1, fontsize = font_size_small),
-  add_plot(mc_biplot_marker, x = 47, y = 114, width = 42, height = 20),
-  add_text("Diff. Gene", x = 70, y = 134.3, hjust = 0.5, vjust = 1, fontsize = font_size_small),
-  add_plot(mc_biplot_diff, x = 47, y = 134, width = 42, height = 20),
+  add_text("Marker Genes", x = 70, y = 114.8, hjust = 0.5, vjust = 1, fontsize = font_size_small),
+  add_plot(mc_biplot_marker, x = 47, y = 114.5, width = 42, height = 20),
+  add_text("Diff. Gene", x = 70, y = 134.8, hjust = 0.5, vjust = 1, fontsize = font_size_small),
+  add_plot(mc_biplot_diff, x = 47, y = 134.5, width = 42, height = 20),
    
   add_text("(E) Predicted differential expression of \\emph{HIST3H2A} for each cell", x = 86.5, y = 111, vjust = 1, fontsize = font_size, fontface = "bold"),
-  add_plot(de_plot + guides(color = "none"), x = 85, y = 110, width = 60, height = 40),
+  add_plot(de_plot_full + labs(subtitle = "Pred. DE for each cell") + theme(plot.subtitle = element_text(size = font_size_small, hjust = 0.5)) + guides(color = "none"), x = 86, y = 113.5, width = 33, height = 34),
+  add_plot(de_plot_split + guides(color = "none"), x = 115, y = 112.5, width = 30, height = 35),
   add_plot(hist3h2a_legend, x = 100.5, y = 147, width = 30, height = 5),
   add_text("down", x = 101, y = 146.9, vjust = 1, fontsize = font_size_small, hjust = 1),
   add_text("regulation", x = 101, y = 148.9, vjust = 1, fontsize = font_size_small, hjust = 1),
@@ -749,8 +760,8 @@ plot_assemble(
   add_text("regulation", x = 40.5, y = 199.9, vjust = 1, fontsize = font_size_small, hjust = 0),
   add_plot(comparison_pl2, x = 61, y = 161, width = 45, height = 41.8),
   add_plot(diff_pl, x = 104, y = 162, width = 25, height = 40.5),
-  
-  
+
+
   add_text("(G) Characterization of tumor\n\\quad\\quad subpopulation", x = 130, y = 158, vjust = 1, fontsize = font_size, fontface = "bold"),
   add_plot(cowplot::get_legend(volcano_enrichment_pl + guides(color = guide_legend(override.aes = list(size = 1))) + labs(color = "")),
            x = 133, y = 164.5, width = 36, height = 4),
