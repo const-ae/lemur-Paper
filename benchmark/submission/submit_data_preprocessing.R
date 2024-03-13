@@ -14,8 +14,8 @@ make_integration_jobs <- function(dataset, variation = "small"){
   
   default_params <- list(data_id = job$result_id, dataset_config = dataset)
   integration_jobs <- list(
-    CPA = cpa_integration_prediction(default_params, dep_job = job, memory = mem),
     CPA_large = cpa_integration_prediction(c(default_params, list(n_latent = 64, max_epochs = 2000)), dep_job = job, memory = mem),
+    CPA_kangparams = cpa_kang_params_integration_prediction(default_params, dep_job = job, memory = mem),
     harmony = harmony_integration(default_params, dep_job = job, memory = mem),
     PCA = pca_integration_prediction(default_params, dep_job = job, memory = mem),
     lemur = lemur_integration_prediction(default_params, dep_job = job, memory = mem),
@@ -34,8 +34,8 @@ make_visualization_jobs <- function(dataset, variation = "small"){
   
   default_params <- list(data_id = job$result_id, dataset_config = dataset)
   integration_jobs <- list(
-    CPA = cpa_integration_prediction(default_params, dep_job = job, memory = mem),
     CPA_large = cpa_integration_prediction(c(default_params, list(n_latent = 64, max_epochs = 2000)), dep_job = job, memory = mem),
+    CPA_kangparams = cpa_kang_params_integration_prediction(default_params, dep_job = job, memory = mem),
     harmony = harmony_integration(default_params, dep_job = job, memory = mem),
     PCA = pca_integration_prediction(default_params, dep_job = job, memory = mem),
     lemur = lemur_integration_prediction(default_params, dep_job = job, memory = mem),
@@ -56,8 +56,8 @@ make_prediction_jobs <- function(dataset, variation = "small"){
   prediction_jobs <- list(
     linear = linear_prediction(default_params, dep_job = job, memory = mem),
     no_change = no_change_prediction(default_params, dep_job = job, memory = mem),
-    CPA = cpa_integration_prediction(default_params, dep_job = job, memory = mem),
     CPA_large = cpa_integration_prediction(c(default_params, list(n_latent = 64, max_epochs = 2000)), dep_job = job, memory = mem),
+    CPA_kangparams = cpa_kang_params_integration_prediction(default_params, dep_job = job, memory = mem),
     PCA = pca_integration_prediction(default_params, dep_job = job, memory = mem),
     lemur = lemur_integration_prediction(default_params, dep_job = job, memory = mem),
     invertible_harmony = lemur_integration_prediction(c(default_params, list(skip_multi_cond_pca = "true")), dep_job = job, memory = mem),
@@ -128,8 +128,6 @@ pred_tab <- get_result_table(pred_jobs)
 write_tsv(pred_tab, glue::glue("output/prediction_results-{variation}.tsv"))
 
 
-
-
 # -------------
 # Make plots
 vis_df <- tibble(name = names(vis_jobs), job = vis_jobs) %>%
@@ -145,9 +143,9 @@ plots <- vis_df %>%
   group_map(\(dat, key){
     dat %>%
       unnest(vis) %>%
-      sample_frac() %>%
+      sample_n(size = min(nrow(dat$vis[[1]]), 1e4)) %>%
       ggplot(aes(x = umap1, y = umap2)) +
-      ggrastr::rasterise(geom_point(aes(color = covariate), size = 0.1, stroke = 0), dpi = 300) +
+      ggrastr::rasterise(geom_point(aes(color = covariate), size = 0.3, stroke = 0), dpi = 300) +
       # geom_point(aes(color = covariate), size = 0.1, stroke = 0) +
       facet_wrap(vars(method), nrow = 1) +
       coord_fixed() +
@@ -167,6 +165,8 @@ tibble(name = names(vis_jobs), job = vis_jobs) %>%
 
 # -------------
 # Kang predictions
+library(MatrixGenerics)
+library(SingleCellExperiment)
 kang_pred <- make_prediction_jobs("kang", variation = variation)
 map_chr(kang_pred, job_status)
 holdout_h5ad_file <- file.path(result_file_path(kang_pred$lemur$dependencies[[1]]), "holdout.h5ad")
