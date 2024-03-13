@@ -174,9 +174,11 @@ power_res <- total_de_info  %>%
 
 
 # Save everything
-dir.create(outdir)
-saveRDS(total_de_info, file.path(outdir, "de_results.RDS"))
-saveRDS(power_res, file.path(outdir, "fdr_tpr_results.RDS"))
+tmp_out_dir <- paste0(out_dir, "-tmp")
+dir.create(tmp_out_dir)
+saveRDS(total_de_info, file.path(tmp_out_dir, "de_results.RDS"))
+saveRDS(power_res, file.path(tmp_out_dir, "fdr_tpr_results.RDS"))
+file.rename(tmp_out_dir, out_dir)
 
 #### Session Info
 sessionInfo()

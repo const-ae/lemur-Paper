@@ -55,9 +55,11 @@ de_res <- data.frame(name = milo_de$gene, pval = milo_de$pval, adj_pval = milo_d
                      lfc = milo_de$logFC, cell_type = as.character(milo_de$Nhood_center))
 
 # Save everything
-dir.create(out_dir)
-saveRDS(de_res, file.path(out_dir, "de_results.RDS"))
-saveRDS(miloR::nhoods(milo_sce), file.path(out_dir, "cluster_assignment.RDS"))
+tmp_out_dir <- paste0(out_dir, "-tmp")
+dir.create(tmp_out_dir)
+saveRDS(de_res, file.path(tmp_out_dir, "de_results.RDS"))
+saveRDS(miloR::nhoods(milo_sce), file.path(tmp_out_dir, "cluster_assignment.RDS"))
+file.rename(tmp_out_dir, out_dir)
 
 #### Session Info
 sessionInfo()

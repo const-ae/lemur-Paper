@@ -30,7 +30,7 @@ if(! var %in% valid_variations){
   stop("Variation ", var,  " is not a recognized dataset variation")
 }
 
-output_file <- file.path(pa$working_dir, "results/", pa$result_id)
+out_dir <- file.path(pa$working_dir, "results/", pa$result_id)
 # ---------------------------------------
 
 config <- get_data_config(pa$dataset)
@@ -70,14 +70,15 @@ if(var == "identity"){
 }
 
 # Save everything
-if(dir.exists(output_file)){
-  unlink(output_file, recursive = TRUE)
+if(dir.exists(out_dir)){
+  unlink(out_dir, recursive = TRUE)
 }
-dir.create(output_file)
-zellkonverter::writeH5AD(train, file.path(output_file, "train.h5ad"), X_name = config$assay_continuous)
+tmp_out_dir <- paste0(out_dir, "-tmp")
+dir.create(tmp_out_dir)
+zellkonverter::writeH5AD(train, file.path(tmp_out_dir, "train.h5ad"), X_name = config$assay_continuous)
 if(! is.null(holdout)){
-  zellkonverter::writeH5AD(holdout, file.path(output_file, "holdout.h5ad"), X_name = config$assay_continuous)
+  zellkonverter::writeH5AD(holdout, file.path(tmp_out_dir, "holdout.h5ad"), X_name = config$assay_continuous)
 }
-
+file.rename(tmp_out_dir, out_dir)
 # Session Info
 sessionInfo()

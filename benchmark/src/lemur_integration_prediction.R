@@ -73,14 +73,15 @@ if(skip_multi_cond_pca){
 }
 
 # Save everything
-dir.create(out_dir)
-write.table(train_embedding, file = file.path(out_dir, glue::glue("train-embedding.tsv")), row.names = FALSE, col.names = FALSE, sep = "\t")
-write.table(holdout_embedding, file = file.path(out_dir, glue::glue("holdout-embedding.tsv")), row.names = FALSE, col.names = FALSE, sep = "\t")
+tmp_out_dir <- paste0(out_dir, "-tmp")
+dir.create(tmp_out_dir)
+write.table(train_embedding, file = file.path(tmp_out_dir, glue::glue("train-embedding.tsv")), row.names = FALSE, col.names = FALSE, sep = "\t")
+write.table(holdout_embedding, file = file.path(tmp_out_dir, glue::glue("holdout-embedding.tsv")), row.names = FALSE, col.names = FALSE, sep = "\t")
 for(idx in seq_along(config$contrast)){
-  write.table(predict_results[[idx]], file = file.path(out_dir, glue::glue("train-prediction_{config$contrast[idx]}.tsv")), row.names = FALSE, col.names = FALSE, sep = "\t")
-  write.table(predict_holdout_results[[idx]], file = file.path(out_dir, glue::glue("holdout-prediction_{config$contrast[idx]}.tsv")), row.names = FALSE, col.names = FALSE, sep = "\t")
+  write.table(predict_results[[idx]], file = file.path(tmp_out_dir, glue::glue("train-prediction_{config$contrast[idx]}.tsv")), row.names = FALSE, col.names = FALSE, sep = "\t")
+  write.table(predict_holdout_results[[idx]], file = file.path(tmp_out_dir, glue::glue("holdout-prediction_{config$contrast[idx]}.tsv")), row.names = FALSE, col.names = FALSE, sep = "\t")
 }
-
+file.rename(tmp_out_dir, out_dir)
 
 #### Session Info
 sessionInfo()

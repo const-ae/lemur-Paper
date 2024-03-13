@@ -40,10 +40,10 @@ embedding <- t(harmony::RunHarmony(red_mat, meta_data = colData(sce),
                             vars_use = c(config$main_covariate, unlist(config$batch_covariates))))
 
 # Save everything
-# qs::qsave(list(embedding = embedding), output_file)
-# Save everything
-dir.create(out_dir)
-write.table(embedding, file = file.path(out_dir, glue::glue("train-embedding.tsv")), row.names = FALSE, col.names = FALSE, sep = "\t")
+tmp_out_dir <- paste0(out_dir, "-tmp")
+dir.create(tmp_out_dir)
+write.table(embedding, file = file.path(tmp_out_dir, glue::glue("train-embedding.tsv")), row.names = FALSE, col.names = FALSE, sep = "\t")
+file.rename(tmp_out_dir, out_dir)
 
 #### Session Info
 sessionInfo()

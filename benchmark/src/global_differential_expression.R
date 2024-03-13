@@ -48,8 +48,10 @@ res <- if(pa$test_method == "glmGamPoi"){
 print(table(res$adj_pval < 0.1, rowData(sce)$is_simulated))
 
 # Save everything
-dir.create(out_dir)
-saveRDS(res, file.path(out_dir, "de_results.RDS"))
+tmp_out_dir <- paste0(out_dir, "-tmp")
+dir.create(tmp_out_dir)
+saveRDS(res, file.path(tmp_out_dir, "de_results.RDS"))
+file.rename(tmp_out_dir, out_dir)
 
 #### Session Info
 sessionInfo()

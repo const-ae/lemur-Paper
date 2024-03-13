@@ -131,11 +131,12 @@ if(skip_multi_cond_pca){
 print(table(nei$adj_pval < 0.1, fit$rowData$is_simulated))
 
 # Save everything
-dir.create(out_dir)
-saveRDS(nei, file.path(out_dir, "de_results.RDS"))
+tmp_out_dir <- paste0(out_dir, "-tmp")
+dir.create(tmp_out_dir)
+saveRDS(nei, file.path(tmp_out_dir, "de_results.RDS"))
 saveRDS(list(lemur_fit_time = lemur_fit_time, lemur_align_time = lemur_align_time,
-               lemur_test_time = lemur_test_time, lemur_nei_time = lemur_nei_time), file.path(out_dir, "duration.RDS"))
-
+               lemur_test_time = lemur_test_time, lemur_nei_time = lemur_nei_time), file.path(tmp_out_dir, "duration.RDS"))
+file.rename(tmp_out_dir, out_dir)
 #### Session Info
 sessionInfo()
 

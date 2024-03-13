@@ -64,9 +64,11 @@ de_res <- purrr::list_rbind(lapply(unique(group_var), \(lvl){
 de_res$adj_pval <- p.adjust(de_res$pval, method = "BH")
 
 # Save everything
-dir.create(out_dir)
-saveRDS(de_res, file.path(out_dir, "de_results.RDS"))
-saveRDS(group_var, file.path(out_dir, "cluster_assignment.RDS"))
+tmp_out_dir <- paste0(out_dir, "-tmp")
+dir.create(tmp_out_dir)
+saveRDS(de_res, file.path(tmp_out_dir, "de_results.RDS"))
+saveRDS(group_var, file.path(tmp_out_dir, "cluster_assignment.RDS"))
+file.rename(tmp_out_dir, out_dir)
 
 #### Session Info
 sessionInfo()

@@ -36,11 +36,13 @@ for(idx in seq_along(config$contrast)){
 # # Save everything
 # qs::qsave(list(predictions = predict_results), output_file)
 # Save everything
-dir.create(out_dir)
+tmp_out_dir <- paste0(out_dir, "-tmp")
+dir.create(tmp_out_dir)
 for(idx in seq_along(config$contrast)){
-  write.table(predict_results[[idx]], file = file.path(out_dir, glue::glue("train-prediction_{config$contrast[idx]}.tsv")), row.names = FALSE, col.names = FALSE, sep = "\t")
-  write.table(predict_holdout_results[[idx]], file = file.path(out_dir, glue::glue("holdout-prediction_{config$contrast[idx]}.tsv")), row.names = FALSE, col.names = FALSE, sep = "\t")
+  write.table(predict_results[[idx]], file = file.path(tmp_out_dir, glue::glue("train-prediction_{config$contrast[idx]}.tsv")), row.names = FALSE, col.names = FALSE, sep = "\t")
+  write.table(predict_holdout_results[[idx]], file = file.path(tmp_out_dir, glue::glue("holdout-prediction_{config$contrast[idx]}.tsv")), row.names = FALSE, col.names = FALSE, sep = "\t")
 }
+file.rename(tmp_out_dir, out_dir)
 
 #### Session Info
 sessionInfo()
