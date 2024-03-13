@@ -35,8 +35,8 @@ method_labels <-  c("PCA" = "PCA", "harmony" = "Harmony", "invertible_harmony" =
 
 ```{r, paged.print = FALSE}
 int_data <- read_tsv(glue("../benchmark/output/integration_results-{variation}.tsv")) %>%
-  filter(method != "CPA") %>%
-  mutate(method = ifelse(method == "CPA_large", "CPA", method))
+  filter(method != "CPA" & method != "CPA_large") %>%
+  mutate(method = ifelse(method == "CPA_kangparams", "CPA", method))
 int_data
 ```
 
@@ -183,7 +183,9 @@ int_bio_pl
 
 
 ```{r, paged.print = FALSE}
-kang_vis <- read_tsv("../benchmark/output/kang_visualization-random_holdout_hvg.tsv")
+kang_vis <- read_tsv("../benchmark/output/kang_visualization-random_holdout_hvg.tsv") %>%
+  filter(method != "CPA" & method != "CPA_large") %>%
+  mutate(method = ifelse(method == "CPA_kangparams", "CPA", method))
 kang_vis
 ```
 
@@ -238,8 +240,8 @@ kang_plot_cell_type
 
 ```{r}
 pred_data <- read_tsv(glue("../benchmark/output/prediction_results-{variation}.tsv")) %>%
-  filter(method != "CPA") %>%
-  mutate(method = ifelse(method == "CPA_large", "CPA", method))
+  filter(method != "CPA" & method != "CPA_large") %>%
+  mutate(method = ifelse(method == "CPA_kangparams", "CPA", method))
 ```
 
 ```{r}
@@ -336,7 +338,9 @@ perf_pred_plot
 
 ```{r, paged.print=FALSE}
 kang_pred <- read_tsv("../benchmark/output/kang-detailed_prediction_results_random_holdout_hvg.tsv") %>%
-  pivot_longer(c(starts_with("stim"), starts_with("ctrl")), names_sep = "-", names_to = c("condition", "cell_type"), values_to = "expression") 
+  pivot_longer(c(starts_with("stim"), starts_with("ctrl")), names_sep = "-", names_to = c("condition", "cell_type"), values_to = "expression") %>%
+  filter(method != "CPA" & method != "CPA_large") %>%
+  mutate(method = ifelse(method == "CPA_kangparams", "CPA", method))
 ```
 
 
