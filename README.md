@@ -17,3 +17,4 @@ It is structured into 5 folders and several additional files which I will explai
 - [Analysis of the Alzheimer plaque densities](https://htmlpreview.github.io/?https://github.com/const-ae/lemur-Paper/blob/master/notebooks/alzheimer_plaques_analysis.html)
 - [Analysis of the zebrafish embryonic development](https://htmlpreview.github.io/?https://github.com/const-ae/lemur-Paper/blob/master/notebooks/zebrafish_analysis.html)
 - [Presentation of the benchmark results](https://htmlpreview.github.io/?https://github.com/const-ae/lemur-Paper/blob/master/notebooks/benchmark_results.html)
+- [LEMUR fit on simulated data](https://htmlpreview.github.io/?https://github.com/const-ae/lemur-Paper/blob/master/notebooks/simulation_study.html)
