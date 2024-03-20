@@ -1,0 +1,173 @@
+---
+title: "R Notebook"
+---
+
+
+
+```{r}
+library(SingleCellExperiment)
+library(tidyverse)
+source("util.R")
+```
+
+
+
+```{r}
+set.seed(2)
+n_cells <- 100
+celltype_assign <- sample(letters[1:2], size = n_cells, replace = TRUE)
+cond_assign <- sample(c("control", "treated"), size = n_cells, replace = TRUE)
+mm <- model.matrix(~ celltype_assign * cond_assign - 1)
+
+celltype_centers <- cbind(c(-2, 3), c(5, 1))
+treat_eff <- cbind(c(0.3, -2), c(-1, 5.5))
+
+Y_mean <- cbind(celltype_centers, treat_eff) %*% t(mm)
+Y <- Y_mean + rnorm(n_cells * 2, sd = 0.2)
+
+plot(t(Y))
+```
+
+
+```{r}
+fit <- lemur::lemur(Y, design = ~ cond_assign - 1, n_embedding = 1)
+fit <- lemur::align_harmony(fit, design = ~ cond_assign, nclust = 2)
+```
+
+```{r}
+fit$linear_coefficients
+fit$alignment_coefficients
+fit$coefficients
+fit$base_point
+
+ctrl_space <- lemur:::grassmann_map(fit$coefficients[,,1], fit$base_point)
+trt_space <- lemur:::grassmann_map(fit$coefficients[,,2], fit$base_point)
+```
+
+```{r}
+Y_pred_ctrl <- predict(fit, newcondition = cond(cond_assign = "control"))
+Y_pred_trt <- predict(fit, newcondition = cond(cond_assign = "treated"))
+```
+
+
+```{r, paged.print=FALSE}
+annotate_subspace <- function(origin = c(0,0), dir = c(1,0), ...){
+  geom_abline(intercept = origin[2] + dir[2] * (-origin[1] / dir[1]), slope = dir[2]/dir[1], ...)
+}
+
+annotate_point <- function(point = c(0,0), ...){
+  annotate("point", x = point[1], y = point[2], ...) 
+}
+
+annotate_ticks <- function(origin = c(0,0), dir = c(1,0), at = seq(-10, 10), length = 0.1, ...){
+  orth_dir <- c(dir[2], -dir[1])
+  pos <- t(lemur:::mply_dbl(at, \(t) origin + t * dir, ncol=2))
+  start <- pos + length/2 * orth_dir
+  end <- pos - length/2 * orth_dir
+  dat <- tibble(pos = t(pos), start = t(start), end = t(end))
+  geom_segment(data = dat, aes(x = start[,1], xend = end[,1], y = start[,2], yend = end[,2]), ...)
+}
+
+annotate_labels_along <- function(origin = c(0,0), dir = c(1,0), labels = "", at = 0, offset = 0, ...){
+  orth_dir <- c(dir[2], -dir[1])
+  pos <- t(lemur:::mply_dbl(at, \(t) origin + t * dir, ncol=2))
+  dat <- tibble(pos = t(pos), labels)
+  angle <- atan2(dir[2], dir[1]) / pi * 180
+  geom_text(data=dat, aes(label = labels, x = pos[,1] + offset * orth_dir[1], y = pos[,2] + offset * orth_dir[2]), angle = angle, ...)
+}
+
+find_intersection <- function(a, v, b, w){
+  k <-  (b[1] - a[1]) / v[1]
+  g <- w[1] / v[1]
+  y <- (b[2] - a[2] - k * v[2]) / (g * v[2] - w[2])
+  b + y * w
+}
+
+```
+
+
+```{r, paged.print=FALSE}
+offset_ctrl <-  fit$alignment_coefficients[,1,1]
+offset_trt <-  fit$alignment_coefficients[,1,2]
+scale_ctrl <- 1 + fit$alignment_coefficients[,2,1]
+scale_trt <- 1 + fit$alignment_coefficients[,2,2]
+
+
+
+arc_dat <- bind_rows(
+  tibble(pos = t(find_intersection(rowMeans(Y), fit$base_point, fit$linear_coefficients[,2], trt_space)), 
+         r = 2, start = atan2(fit$base_point[1], fit$base_point[2]), end = atan2(trt_space[1], trt_space[2])),
+  tibble(pos = t(find_intersection(rowMeans(Y), fit$base_point, fit$linear_coefficients[,1], ctrl_space)), 
+         r = 2.7, start = atan2(fit$base_point[1], fit$base_point[2]), end = atan2(ctrl_space[1], ctrl_space[2])))
+
+# Lets make some data
+pl1 <- tibble(celltype = celltype_assign, condition = cond_assign, 
+       Y = t(Y), Y_ctrl = t(Y_pred_ctrl), Y_trt = t(Y_pred_trt)) %>%
+  ggplot() +
+    annotate_subspace(origin = rowMeans(Y), dir = fit$base_point, color = "#898989", lwd = 0.5) +
+    annotate_labels_along(origin = rowMeans(Y), dir = fit$base_point, labels = "$o$: base subspace", at = 4, 
+                          offset = 0.15, size = font_size_small/.pt, color = "#898989") +
+    annotate_subspace(origin = fit$linear_coefficients[,1], dir = ctrl_space, color = "black", lwd = 0.6) +
+    annotate_labels_along(origin = fit$linear_coefficients[,1], dir = ctrl_space, labels = "$R(\\textrm{control})$", at = 4, 
+                          hjust = 0, offset = -0.2, size = font_size_small/.pt, color = "#898989") +
+    annotate_subspace(origin = fit$linear_coefficients[,2], dir = trt_space, color = "black", lwd = 0.6) +
+    annotate_labels_along(origin = fit$linear_coefficients[,2], dir = trt_space, labels = "$R(\\textrm{treated})$", at = 4, 
+                          hjust = 0, offset = 0.15, size = font_size_small/.pt, color = "#898989") +
+    annotate_ticks(fit$linear_coefficients[,1] - ctrl_space %*% offset_ctrl, dir = ctrl_space * scale_ctrl, at = -5:4) +
+    annotate_ticks(fit$linear_coefficients[,2] - trt_space %*% offset_trt, dir = trt_space * scale_trt, at = -5:5) +
+    annotate_labels_along(fit$linear_coefficients[,1] - ctrl_space %*% offset_ctrl, dir = ctrl_space * scale_ctrl, at = -5:4, labels = -5:4, offset = 0.2, size = font_size_tiny / .pt) +
+    annotate_labels_along(fit$linear_coefficients[,2] - trt_space %*% offset_trt, dir = trt_space * scale_trt, at = c(-5:-2, 0:5), labels = c(-5:-2, 0:5), offset = -0.2, size = font_size_tiny / .pt) +
+    ggforce::geom_arc(data = arc_dat, aes(x0=pos[,1], y0=pos[,2], r=r, start=start, end=end), linetype = "solid", arrow = arrow(type="closed", length = unit(2, "mm"))) +
+    annotate("text", x = 3, y = 3.05, label = "$\\operatorname{Exp}^{(\\textrm{Gr})}_{o}(x B)$", hjust = 0, size = font_size_small/.pt) +
+    annotate("text", x = 1.3, y = 1.3, label = "$x \\Gamma$", hjust = 0.5, size = font_size_small/.pt) +
+    annotate("segment", x = 1.3, y = 1.5, xend = fit$linear_coefficients[1,1], yend = fit$linear_coefficients[2,1], color = "lightgrey") +
+    annotate_point(fit$linear_coefficients[,1]) +
+    annotate_point(fit$linear_coefficients[,2]) +
+    geom_point(aes(x = Y[,1], y = Y[,2], color = condition), size = 0.5) +
+    labs(x = "Gene 1", y = "Gene 2") +
+    coord_fixed(xlim = c(-3, 6), ylim = c(-0.5, 6), clip = "off") +
+    theme(legend.position = "bottom") 
+
+pl1
+```
+
+```{r, paged.print=FALSE}
+true_de <- tibble(emb = c(-3.8, 3.3, -3.8, 3.3), Gene = c("Gene 1", "Gene 1", "Gene 2", "Gene 2"),
+                  de = c(treat_eff[1,1], treat_eff[1,1] + treat_eff[1,2], treat_eff[2,1], treat_eff[2,1] + treat_eff[2,2]))
+
+pl2 <- tibble(celltype = celltype_assign, condition = cond_assign,emb = fit$embedding[1,]) %>%
+  mutate(diff = as_tibble(t(Y_pred_trt - Y_pred_ctrl), .name_repair = \(.) c("Gene 1", "Gene 2"))) %>%
+  unpack(diff, names_sep = "-") %>%
+  pivot_longer(starts_with("diff"), names_sep = "-", names_to = c(".value", "Gene")) %>%
+  ggplot(aes(x = emb, y = diff)) +
+    geom_segment(aes(xend = emb, yend = 0, color = condition), lwd = 0.2, show.legend = FALSE) +
+    geom_segment(data = true_de, aes(x = emb - 0.4, xend = emb + 0.4, y = de, yend = de), lwd = 0.8, color = "black", linetype = "solid") +
+    annotate_subspace() +
+    annotate_ticks(length = 0.3) +
+    annotate_labels_along(at = -5:5, labels = -5:5, offset = 0.4, size = font_size_tiny / .pt) +
+    facet_wrap(vars(Gene), ncol = 1) +
+    lims(x = c(-5, 5)) +
+    labs(x = "Embedding Position ($Z$)", y = "$\\Delta$ (Treated - Control)") +
+    theme(axis.ticks.x = element_blank(), axis.text.x = element_blank(), axis.line.x = element_blank())
+
+pl2
+```
+
+
+```{r}
+plot_assemble(
+  add_plot(pl1 + labs(title = "(A) LEMUR fit on simulated data with two genes"), x = 0, y = 1, width = 90, height = 80),
+  add_plot(pl2 + labs(title = "(B) Predicted differential expression"), x = 100, y = 2, width = 80, height = 72),
+  width = 170, height = 80, units = "mm", show_grid_lines = FALSE,
+  latex_support = TRUE, filename = "../plots/suppl_simulated_data.pdf"
+)
+```
+
+
+
+# Session info
+
+```{r}
+sessionInfo()
+```
+
