@@ -14,11 +14,11 @@ This repository contains the code to reproduce all figures from the manuscript. 
 
 # Rendered Notebooks
 
--   [Analysis of panobinostat treatment in glioblastoma](https://htmlpreview.github.io/?https://github.com/const-ae/lemur-Paper/blob/master/notebooks/glioblastoma_analysis.html)
--   [Analysis of the Alzheimer plaque densities](https://htmlpreview.github.io/?https://github.com/const-ae/lemur-Paper/blob/master/notebooks/alzheimer_plaques_analysis.html)
--   [Analysis of the zebrafish embryonic development](https://htmlpreview.github.io/?https://github.com/const-ae/lemur-Paper/blob/master/notebooks/zebrafish_analysis.html)
--   [Presentation of the benchmark results](https://htmlpreview.github.io/?https://github.com/const-ae/lemur-Paper/blob/master/notebooks/benchmark_results.html)
--   [LEMUR fit on simulated data](https://htmlpreview.github.io/?https://github.com/const-ae/lemur-Paper/blob/master/notebooks/simulation_study.html)
+-   [Preparation](https://htmlpreview.github.io/?https://github.com/const-ae/lemur-Paper/blob/master/benchmark/submission/prepare_glioblastoma.html) and [visualization](https://htmlpreview.github.io/?https://github.com/const-ae/lemur-Paper/blob/master/notebooks/glioblastoma_analysis.html) of panobinostat treatment in glioblastoma. 
+-   [Preparation](https://htmlpreview.github.io/?https://github.com/const-ae/lemur-Paper/blob/master/benchmark/submission/prepare_alzheimer_plaques.html) and [visualization](https://htmlpreview.github.io/?https://github.com/const-ae/lemur-Paper/blob/master/notebooks/alzheimer_plaques_analysis.html) of the Alzheimer plaque densities
+-   [Preparation](https://htmlpreview.github.io/?https://github.com/const-ae/lemur-Paper/blob/master/benchmark/submission/prepare_zebrafish.html) and [visualization](https://htmlpreview.github.io/?https://github.com/const-ae/lemur-Paper/blob/master/notebooks/zebrafish_analysis.html) of the zebrafish embryonic development
+-   [Presentation](https://htmlpreview.github.io/?https://github.com/const-ae/lemur-Paper/blob/master/notebooks/benchmark_results.html) of the [benchmark](https://github.com/const-ae/lemur-Paper/blob/master/benchmark/submission/submit_data_preprocessing.R) results
+-   [Visualization](https://htmlpreview.github.io/?https://github.com/const-ae/lemur-Paper/blob/master/notebooks/simulation_study.html) of a LEMUR fit on simulated data
 
 # Software
 
