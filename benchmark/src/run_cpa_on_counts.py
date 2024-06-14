@@ -1,8 +1,8 @@
 import os
 import sys
 print(os.getcwd())
+# This makes the config_helper file available
 sys.path.insert(0, os.getcwd())  
-
 
 import argparse
 import src.utils.config_helper as ch
@@ -14,6 +14,7 @@ import scanpy as sc
 import numpy as np
 import pandas as pd
 from pandas.api.types import is_numeric_dtype
+import random
 import cpa
 import session_info
 
@@ -23,11 +24,12 @@ print("Hello from python")
 parser = argparse.ArgumentParser(description='Run CPA with Kangs parameters')
 parser.add_argument('--data_id', dest='data_id', action='store', required = True, help='The id of a file in output/results')
 parser.add_argument("--dataset_config", dest = "dataset_config", required = True, help = "The name of a dataset in datasets.yaml")
+parser.add_argument("--no_integration", dest = "no_integration", action = "store_true", default = False, help = "Don't try to integrate data")
 
 parser.add_argument("--working_dir", dest = "working_dir", action='store', required = True, help = "The directory that contains the params, results, scripts etc.")
 parser.add_argument("--result_id", dest = "result_id", action='store', required = True, help = "The result_id")
 args = parser.parse_args()
-# args = parser.parse_args(["--data_id", "f1809110732c2-e5f290978d2e2",
+# args = parser.parse_args(["--data_id", "337dc3137fe9d-e5f290978d2e2",
 #     "--dataset_config", "kang", "--working_dir",
 #     "/scratch/ahlmanne/lemur_benchmark", "--result_id", "0"])
 print(args)
@@ -43,48 +45,31 @@ holdout_adata = sc.read_h5ad(args.working_dir + "/results/" +  args.data_id + "/
 adata.X = adata.layers[config['assay_counts']].copy()
 holdout_adata.X = holdout_adata.layers[config['assay_counts']].copy()
 
+def prepare_adata(adata, control_group, perturbation_key, dosage_key):
+  cpa.CPA.setup_anndata(adata, 
+                      perturbation_key=perturbation_key,
+                      control_group = control_group, 
+                      dosage_key = dosage_key,
+                      categorical_covariate_keys=[],
+                      is_count_data=True,
+                      max_comb_len=1)
+  return adata
+
+if args.no_integration:
+  # CPA needs at least two groups. I will randomly assign cells 
+  # to groups so that the data is already perfectly integrated
+  random.shuffle(adata.obs[config['main_covariate']])
+
 if is_numeric_dtype(adata.obs[config['main_covariate']]):
   adata.obs['key'] = np.where(adata.obs[config['main_covariate']] == config['contrast'][0], "ctrl", "pert")
   holdout_adata.obs['key'] = np.where(holdout_adata.obs[config['main_covariate']] == config['contrast'][0], "ctrl", "pert")
-  cpa.CPA.setup_anndata(adata, 
-                        perturbation_key='key',
-                        control_group = config['contrast'][0], 
-                        dosage_key = config['main_covariate'],
-                        categorical_covariate_keys=[],
-                        is_count_data=True,
-                        max_comb_len=1,
-                       )
-  cpa.CPA.setup_anndata(holdout_adata, 
-                        perturbation_key='key',
-                        control_group = config['contrast'][0], 
-                        dosage_key = config['main_covariate'],
-                        categorical_covariate_keys=[],
-                        is_count_data=True,
-                        max_comb_len=1,
-                       )
+  prepare_adata(adata, config['contrast'][0], 'key', config['main_covariate'])
+  prepare_adata(holdout_adata, config['contrast'][0], 'key', config['main_covariate'])
 else:
   adata.obs['dose'] = adata.obs[config['main_covariate']].apply(lambda x: '+'.join(['1.0' for _ in x.split('+')]))
   holdout_adata.obs['dose'] = holdout_adata.obs[config['main_covariate']].apply(lambda x: '+'.join(['1.0' for _ in x.split('+')]))
-  cpa.CPA.setup_anndata(adata,
-                        perturbation_key=config['main_covariate'],
-                        control_group=config['contrast'][-1],
-                        dosage_key='dose',
-                        categorical_covariate_keys=[],
-                        is_count_data=True,
-                        max_comb_len=1,
-                       )
-  cpa.CPA.setup_anndata(holdout_adata,
-                        perturbation_key=config['main_covariate'],
-                        control_group=config['contrast'][-1],
-                        dosage_key='dose',
-                        categorical_covariate_keys=[],
-                        is_count_data=True,
-                        max_comb_len=1,
-                       )
-
-
-
-
+  prepare_adata(adata, config['contrast'][-1], config['main_covariate'], "dose")
+  prepare_adata(holdout_adata, config['contrast'][-1], config['main_covariate'], "dose")
 
 
 model_params = {
@@ -160,30 +145,32 @@ def shifted_log_transform(counts, overdispersion = 0.05, pseudo_count = None, mi
 
 # Make predictions
 conditions = config['contrast']
-trained_preds = []
-holdout_preds = []
-for cond in conditions:
-  if cond == config['contrast'][0]:
-    train_pred = model.custom_predict(basal = True, add_batch = False, add_pert = False)
-    holdout_pred = model.custom_predict(basal = True, add_batch = False, add_pert = False, adata = holdout_adata)
-  else:
-    train_pred = model.custom_predict(basal = False, add_batch = False, add_pert = True)
-    holdout_pred = model.custom_predict(basal = False, add_batch = False, add_pert = True, adata = holdout_adata)
-    
-  # Apply the same log transformation as to the original counts
-  train_pred_mat = shifted_log_transform(train_pred['latent_x_pred'].X)
-  holdout_pred_mat = shifted_log_transform(holdout_pred['latent_x_pred'].X)
-  trained_preds.append(train_pred_mat.transpose())
-  holdout_preds.append(holdout_pred_mat.transpose())
+if not args.no_integration:
+  trained_preds = []
+  holdout_preds = []
+  for cond in conditions:
+    if cond == config['contrast'][0]:
+      train_pred = model.custom_predict(basal = True, add_batch = False, add_pert = False)
+      holdout_pred = model.custom_predict(basal = True, add_batch = False, add_pert = False, adata = holdout_adata)
+    else:
+      train_pred = model.custom_predict(basal = False, add_batch = False, add_pert = True)
+      holdout_pred = model.custom_predict(basal = False, add_batch = False, add_pert = True, adata = holdout_adata)
+      
+    # Apply the same log transformation as to the original counts
+    train_pred_mat = shifted_log_transform(train_pred['latent_x_pred'].X)
+    holdout_pred_mat = shifted_log_transform(holdout_pred['latent_x_pred'].X)
+    trained_preds.append(train_pred_mat.transpose())
+    holdout_preds.append(holdout_pred_mat.transpose())
 
 # Make out_dir
 Path(out_dir).mkdir(exist_ok = False)
 # Save embeddings
 np.savetxt(out_dir + "/train-embedding.tsv", latent_outputs["latent_basal"].X.transpose(), delimiter = "\t")
 np.savetxt(out_dir + "/holdout-embedding.tsv", basal_predict['latent_z_basal'].X.transpose(), delimiter = "\t")
-for idx in np.arange(len(conditions)):
-  np.savetxt(out_dir + f"/train-prediction_{conditions[idx]}.tsv", trained_preds[idx], delimiter = "\t")
-  np.savetxt(out_dir + f"/holdout-prediction_{conditions[idx]}.tsv", holdout_preds[idx], delimiter = "\t")
+if not args.no_integration:
+  for idx in np.arange(len(conditions)):
+    np.savetxt(out_dir + f"/train-prediction_{conditions[idx]}.tsv", trained_preds[idx], delimiter = "\t")
+    np.savetxt(out_dir + f"/holdout-prediction_{conditions[idx]}.tsv", holdout_preds[idx], delimiter = "\t")
 
 
 

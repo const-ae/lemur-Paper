@@ -18,6 +18,7 @@ import session_info
 parser = argparse.ArgumentParser(description='Run scVI')
 parser.add_argument('--data_id', dest='data_id', action='store', required = True, help='The id of a file in output/results')
 parser.add_argument("--dataset_config", dest = "dataset_config", required = True, help = "The name of a dataset in datasets.yaml")
+parser.add_argument("--no_integration", dest = "no_integration", action = "store_true", default = False, help = "Don't try to integrate data")
 
 parser.add_argument("--working_dir", dest = "working_dir", action='store', required = True, help = "The directory that contains the params, results, scripts etc.")
 parser.add_argument("--result_id", dest = "result_id", action='store', required = True, help = "The result_id")
@@ -47,12 +48,18 @@ continuous_batch_cov = is_numeric_dtype(adata.obs[config['main_covariate']])
 def prepare_adata(adata):
   if continuous_batch_cov:
     adata.obs[config['main_covariate']] = [str(x) for x in adata.obs[config['main_covariate']]]
-    
-  scvi.model.SCVI.setup_anndata(
-      adata,
-      layer=config['assay_counts'],
-      batch_key=config['main_covariate']
-  )
+  
+  if args.no_integration:
+    scvi.model.SCVI.setup_anndata(
+        adata,
+        layer=config['assay_counts']
+    )
+  else:
+    scvi.model.SCVI.setup_anndata(
+        adata,
+        layer=config['assay_counts'],
+        batch_key=config['main_covariate']
+    )
   return adata
   
 
@@ -86,16 +93,17 @@ if continuous_batch_cov:
   conditions = [str(x) for x in conditions]
   
 
-trained_preds = []
-holdout_preds = []
-for cond in conditions:
-  train_pred  = model.get_normalized_expression(transform_batch = cond, library_size = "latent")
-  holdout_pred = model.get_normalized_expression(adata = holdout_adata, transform_batch = cond, library_size = "latent")
-   # Apply the same log transformation as to the original counts
-  train_pred_mat = shifted_log_transform(train_pred.to_numpy())
-  holdout_pred_mat = shifted_log_transform(holdout_pred.to_numpy())
-  trained_preds.append(train_pred_mat.transpose())
-  holdout_preds.append(holdout_pred_mat.transpose())
+if not args.no_integration:
+  trained_preds = []
+  holdout_preds = []
+  for cond in conditions:
+    train_pred  = model.get_normalized_expression(transform_batch = cond, library_size = "latent")
+    holdout_pred = model.get_normalized_expression(adata = holdout_adata, transform_batch = cond, library_size = "latent")
+     # Apply the same log transformation as to the original counts
+    train_pred_mat = shifted_log_transform(train_pred.to_numpy())
+    holdout_pred_mat = shifted_log_transform(holdout_pred.to_numpy())
+    trained_preds.append(train_pred_mat.transpose())
+    holdout_preds.append(holdout_pred_mat.transpose())
   
   
 
@@ -105,9 +113,10 @@ Path(out_dir).mkdir(exist_ok = False)
 # Save embeddings
 np.savetxt(out_dir + "/train-embedding.tsv", train_latent_outputs.transpose(), delimiter = "\t")
 np.savetxt(out_dir + "/holdout-embedding.tsv", holdout_latent_outputs.transpose(), delimiter = "\t")
-for idx in np.arange(len(conditions)):
-  np.savetxt(out_dir + f"/train-prediction_{conditions[idx]}.tsv", trained_preds[idx], delimiter = "\t")
-  np.savetxt(out_dir + f"/holdout-prediction_{conditions[idx]}.tsv", holdout_preds[idx], delimiter = "\t")
+if not args.no_integration:
+  for idx in np.arange(len(conditions)):
+    np.savetxt(out_dir + f"/train-prediction_{conditions[idx]}.tsv", trained_preds[idx], delimiter = "\t")
+    np.savetxt(out_dir + f"/holdout-prediction_{conditions[idx]}.tsv", holdout_preds[idx], delimiter = "\t")
 
 
 

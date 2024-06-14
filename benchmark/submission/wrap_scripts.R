@@ -43,13 +43,7 @@ pca_integration_prediction <- function(params, dep_job, duration = "06:00:00", m
                                  duration = duration, memory = memory)
 }
 
-cpa_integration_prediction <- function(params, dep_job, duration = "24:00:00", memory = "80GB"){
-  MyWorkflowManager::wrap_script("src/run_cpa.py", params = params, 
-                                 dependencies = list(dep_job), executor = "python",
-                                 extra_args = "cpa_env", duration = duration, memory = memory)
-}
-
-cpa_kang_params_integration_prediction <- function(params, dep_job, duration = "24:00:00", memory = "80GB"){
+cpa_on_counts_integration_prediction <- function(params, dep_job, duration = "24:00:00", memory = "80GB"){
   MyWorkflowManager::wrap_script("src/run_cpa_on_counts.py", params = params, 
                                  dependencies = list(dep_job), executor = "python",
                                  extra_args = "cpa_env", duration = duration, memory = memory)

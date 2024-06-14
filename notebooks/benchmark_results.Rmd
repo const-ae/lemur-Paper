@@ -35,7 +35,6 @@ method_labels <-  c("PCA" = "PCA", "harmony" = "Harmony", "invertible_harmony" =
 
 ```{r, paged.print = FALSE}
 int_data <- read_tsv(glue("../benchmark/output/integration_results-{variation}.tsv")) %>%
-  filter(method != "CPA" & method != "CPA_large") %>%
   mutate(method = ifelse(method == "CPA_kangparams", "CPA", method))
 int_data
 ```
@@ -49,7 +48,7 @@ setdiff(unique(int_data$method), methods)
 
 
 ```{r}
-int_metrics <- vars(mmd, wasserstein, mix, ARI, AMI, NMI, celltypeSS_over_totalSS, batchSS_over_totalSS)
+int_metrics <- vars(mmd, wasserstein, mix, overlap, ARI, AMI, NMI, celltypeSS_over_totalSS, batchSS_over_totalSS)
 
 perf_data <- int_data %>%
   mutate(mmd = log(mmd)) %>%
@@ -79,11 +78,11 @@ suppl_int_mix_plt <- perf_data %>%
           panel.spacing.y = unit(5, "mm")) +
     labs(title = "(A) Integration of conditions")
 
-suppl_int_signal_plt <- perf_data %>%
+suppl_int_signal_plt1 <- perf_data %>%
   mutate(method = factor(method, levels = methods)) %>%
-  filter(metric %in% c("ARI",  "AMI", "NMI", "celltypeSS_over_totalSS")) %>%
-  mutate(metric = factor(metric, levels = c("ARI",  "AMI", "NMI", "celltypeSS_over_totalSS"),
-                         labels = c("ARI $\\uparrow$", "AMI $\\uparrow$", "NMI $\\uparrow$", "Var. explained by cell type $\\uparrow$"))) %>%
+  filter(metric %in% c("ARI",  "NMI", "celltypeSS_over_totalSS")) %>%
+  mutate(metric = factor(metric, levels = c("ARI",  "NMI", "celltypeSS_over_totalSS"),
+                         labels = c( "ARI $\\uparrow$", "NMI $\\uparrow$", "Var. explained by cell type $\\uparrow$"))) %>%
   ggplot(aes(x = method, y = value)) +
     ggbeeswarm::geom_quasirandom(size = 0.4, width = 0.3) +
     stat_summary(geom = "pointrange", fun.data = mean_se, color = "red", size = 1, fatten = 1) +
@@ -95,7 +94,27 @@ suppl_int_signal_plt <- perf_data %>%
     guides(x = guide_axis(angle = 90)) +
     theme(panel.grid.major.y = element_line(colour = "grey50"), axis.title = element_blank(),
           panel.spacing.y = unit(5, "mm")) +
+    labs(title = "")
+
+suppl_int_signal_plt2 <- perf_data %>%
+  mutate(method = factor(method, levels = methods)) %>%
+  filter(metric %in% c("overlap")) %>%
+  mutate(metric = factor(metric, levels = c("overlap"),
+                         labels = c("$k$-NN Overlap $\\uparrow$"))) %>%
+  ggplot(aes(x = method, y = value)) +
+    ggbeeswarm::geom_quasirandom(size = 0.4, width = 0.3) +
+    stat_summary(geom = "pointrange", fun.data = mean_se, color = "red", size = 1, fatten = 1) +
+    ggh4x::facet_grid2(vars(comparison), vars(metric), scales = "free_y", independent = "y",
+                       labeller = labeller(comparison = as_labeller(condition_labels)),
+                       strip = ggh4x::strip_vanilla(clip = "off")) +
+    scale_x_discrete(labels = method_labels) +
+    scale_y_continuous(breaks = c(0, 5, 10, 15, 20), limits = c(0, 20), expand = expansion(add = 0)) +
+    guides(x = guide_axis(angle = 90)) +
+    theme(panel.grid.major.y = element_line(colour = "grey50"), axis.title = element_blank(),
+          panel.spacing.y = unit(5, "mm"), strip.text.y = element_blank()) +
     labs(title = "(B) Biological signal retention")
+
+
 
 suppl_int_ss_plt <- perf_data %>%
   mutate(method = factor(method, levels = methods)) %>%
@@ -121,7 +140,8 @@ suppl_int_ss_plt <- perf_data %>%
 
 plot_assemble(
   add_plot(suppl_int_mix_plt  + guides(color = "none"), x = 0, y = 0, width = 170, height = 60),
-  add_plot(suppl_int_signal_plt + guides(color = "none"), x = 0, y = 60, width = 170, height = 60),
+  add_plot(suppl_int_signal_plt2 + guides(color = "none"), x = 0, y = 60, width = 40, height = 60),
+  add_plot(suppl_int_signal_plt1 + guides(color = "none"), x = 40, y = 60, width = 130, height = 60),
   add_plot(suppl_int_ss_plt + guides(color = "none"), x = 0, y = 120, width = 46, height = 60),
   
   width = 170, height = 180, units = "mm", show_grid_lines = FALSE,
@@ -181,7 +201,7 @@ int_bio_pl <- int_bio_df %>%
     ggrepel::geom_text_repel(data = . %>% summarize(value = matrix(colMeans(value), nrow = 1), .by = method), aes(label = method_labels[method]), 
                              size = font_size_small / .pt, point.padding = unit(3, "mm") ) +
     annotation_custom(grid::polylineGrob(x = c(0.91, 0.99), y = c(0.91, 0.99), gp = grid::gpar(fill = "black"), arrow =  grid::arrow(ends = "last", type = "closed", angle = 20, length = unit(10 / 7, "mm")))) +
-    labs(y = "Biological signal retention (Relative ARI)",x = "Integration of conditions (Relative $k$-NN mixing)") +
+    labs(y = "Biological signal retention\nARI normalized per dataset",x = "Integration of conditions\n$k$-NN mixing normalized per dataset") +
     scale_x_continuous(limits = c(0, 1.7), breaks = c(0, 1, 2), expand = expansion(add = c(0, 0.05))) +
     scale_y_continuous(limits = c(0, 1.3), breaks = c(0, 1), expand = expansion(add = c(0, 0.05))) +
     guides(color = "none") +
@@ -303,7 +323,7 @@ pl1 <- full_data_rel %>%
     guides(x = guide_axis(angle = 90)) +
     theme(axis.title.x = element_blank(), plot.title.position = "plot", 
           panel.spacing.y = unit(5, "mm")) +
-    labs(title = "(A) Distances between predicted and observed expression", y = "distance (normalized per dataset)")
+    labs(title = "Distances and correlation measures between predicted and observed expression", y = "distance (normalized per dataset)")
 
 pl2 <- full_data_rel %>%
   filter(str_starts(metric, "r2")) %>%
@@ -321,7 +341,7 @@ pl2 <- full_data_rel %>%
     guides(x = guide_axis(angle = 90)) +
     theme(axis.title.x = element_blank(), plot.title.position = "plot",
           strip.text.y.right =  element_blank(), panel.spacing.y = unit(5, "mm")) +
-    labs(title = "(B) Correlation and maximum mean discrepancy between predicted and observed expression", y = "correlation")
+    labs(title = "", y = "correlation")
 
 pl3 <- full_data_rel %>%
   filter(metric == "mmd") %>%
@@ -520,11 +540,11 @@ prec_recall_plot <- prec_recall_df %>%
     scale_x_continuous(expand = expansion(0), breaks = c(0, 0.25, 0.5, 0.75, 1), labels = c("0", "0.25", "0.5", "0.75", "1")) +
     scale_y_continuous(expand = expansion(0), breaks = c(0, 0.5, 1), labels = c("0", "0.5", "1")) +
     scale_color_manual(values = c("special" = "red", "signif" = "black", "not signif" = "lightgrey"), 
-                       labels = c("special" = "Example gene\nfrom F,G", "signif" = "signif. genes", "not signif" = "not signif. genes")) +
+                       labels = c("special" = "Example\nfrom F,G", "signif" = "signif. genes", "not signif" = "not signif. genes")) +
     scale_size_manual(values = c("special" = 0.7, "signif" = 0.4, "not signif" = 0.1)) +
     guides(color = guide_legend(override.aes = list(alpha = 1, size = 1.5)), size = "none") +
     coord_cartesian(clip = "off") +
-    labs(title = "(H) Overlap of neighborhoods with ground truth",
+    labs(title = "(H) Neighborhood \\& ground truth overlap",
          subtitle = paste0("Precision: fraction of neighborhood inside ground truth\n",
                            "Recall: fraction of ground truth inside neighborhood"), 
          color = "", x = "Recall", y = "Precision") +
@@ -600,7 +620,7 @@ de_power_fdr_with_label <- de_power_fdr %>%
     es == "dir_contrast" ~ "contrast directions",
     es == "skip_al" ~ "$S=I$ (rigid)",
     es == "skip_multCondPCA" ~ "parametric Harmony",
-    es == "sf_method_ratio" ~ "ratio size factor estimation",
+    es == "sf_method_ratio" ~ "ratio size factor",
     es == "count_split" ~ "count splitting",
     es == "notesttraining" ~ "no test/train split",
     TRUE ~ es
@@ -802,14 +822,13 @@ plot_assemble(
 
 ```{r}
 plot_assemble(
-  add_plot(kang_plot, x = 0, y = 0, width = 110, height = 50),
-  add_text("(B) Integration Performance", x = 111.5, y = 1.5, fontsize = font_size, vjust = 1, fontface = "bold"),
-  add_plot(int_bio_pl, x = 110, y = 5, width = 60, height = 45),
+  add_plot(kang_plot, x = 0, y = 0, width = 117, height = 45),
+  add_text("(B) Integration Performance", x = 114.5, y = 1.5, fontsize = font_size, vjust = 1, fontface = "bold"),
+  add_plot(int_bio_pl, x = 113, y = 5, width = 55, height = 42),
 
-  # add_plot(kang_plot_cell_type, x = 0, y = 50, width = 30, height = 37),
   add_plot(ct_scatter_plot + guides(color = "none"), x = 0, y = 50, width = 110, height = 40),
   add_plot(cowplot::get_legend(ct_scatter_plot) , x = 10, y = 88, width = 75, height = 10),
-  add_plot(perf_pred_plot, x = 110, y = 50, width = 60, height = 40),
+  add_plot(perf_pred_plot, x = 113, y = 50, width = 55, height = 40),
   
   add_text("(F) Simulated DE", x = 2.7, y = 101.4, fontsize = font_size, vjust = 1, fontface = "bold"),
   add_plot(de_simulated_pl, x = 0, y = 100, width = 30, height = 45),
@@ -817,12 +836,12 @@ plot_assemble(
   add_text("(G) Predicted DE with neighborhood", x = 54, y = 101.4, fontsize = font_size, vjust = 1, fontface = "bold"),
   add_plot(de_pred_pl, x = 53, y = 100, width = 40, height = 45),
   add_plot(de_nei_pl, x = 83, y = 100, width = 35, height = 45),
-  add_plot(prec_recall_plot + guides(color = "none"), x = 110, y = 100, width = 60, height = 42),
+  add_plot(prec_recall_plot + guides(color = "none"), x = 113, y = 100, width = 55, height = 42),
   add_plot(cowplot::get_legend(prec_recall_plot), x = 115, y = 140, width = 50, height = 5),
   
-  add_plot(fdr_control_plot, x = 0, y = 145, width = 40, height = 60),
-  add_plot(power_plot, x = 40, y = 145, width = 68, height = 60),
-  add_plot(power_per_desize_plot, x = 110, y = 145, width = 60, height = 60),
+  add_plot(fdr_control_plot, x = 0, y = 150, width = 40, height = 55),
+  add_plot(power_plot, x = 40, y = 150, width = 68, height = 55),
+  add_plot(power_per_desize_plot, x = 113, y = 150, width = 55, height = 55),
   
   width = 170, height = 205, units = "mm", show_grid_lines = FALSE,
   latex_support = TRUE, filename = "../plots/performance_validation.pdf"

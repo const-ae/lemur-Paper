@@ -113,6 +113,29 @@ mixing_score <- function(data, ref_data, is_gr1, ref_is_gr1, k = 20){
   }, FUN.VALUE = numeric(1L)))
 }
 
+overlap_score <- function(data, noint_data, is_gr1, k = 20){
+  score1 <- overlap_score_impl(ref_embedding[,is_gr1], noint_embedding[,is_gr1])
+  score2 <- overlap_score_impl(ref_embedding[,!is_gr1], noint_embedding[,!is_gr1])
+  list(overlap = (score1 + score2) / 2)
+}
+
+overlap_score_impl <- function(data, noint_data, k = 20){
+  stopifnot(ncol(noint_data) == ncol(data))
+  stopifnot(length(k) == 1 && k > 0 && k < ncol(data))
+  
+  noint_index <- BiocNeighbors::buildAnnoy(noint_data, transposed = TRUE)
+  noint_nei <- BiocNeighbors::queryAnnoy(precomputed = noint_index, query = noint_data, k = k, transposed = TRUE, 
+                                         get.index = TRUE, get.distance = FALSE)$index
+  data_index <- BiocNeighbors::buildAnnoy(data, transposed = TRUE)
+  data_nei <- BiocNeighbors::queryAnnoy(precomputed = data_index, query = data, k = k, transposed = TRUE, 
+                                          get.index = TRUE, get.distance = FALSE)$index
+  
+  mean(vapply(seq_len(ncol(data)), \(idx){
+    length(intersect(noint_nei[idx,], data_nei[idx,]))
+  }, FUN.VALUE = numeric(1L)))
+}
+
+
 structure_conservation <- function(large_data, embedding, is_gr1){
   pca_ref_gr1 <- irlba::prcomp_irlba(t(large_data[, is_gr1]), n = 30)  
   clustering_ref_gr1 <- bluster::clusterRows(pca_ref_gr1$x, bluster::KNNGraphParam())
@@ -153,6 +176,7 @@ pa <- argparser::add_argument(pa, "--data_id", type = "character", help = "The i
 pa <- argparser::add_argument(pa, "--dataset_config", type = "character", nargs = 1, help = "The name of a dataset in datasets.yaml") 
 pa <- argparser::add_argument(pa, "--dataset_config_override", type = "character", default = "", nargs = Inf, help = "Override settings from datasets.yaml") 
 pa <- argparser::add_argument(pa, "--integration_id", type = "character", help = "The result id of the integration job")
+pa <- argparser::add_argument(pa, "--reference_id", type = "character", help = "The result id of the reference job")
 
 pa <- argparser::add_argument(pa, "--seed", type = "integer", default = 1, nargs = 1, help = "The seed")
 
@@ -160,9 +184,10 @@ pa <- argparser::add_argument(pa, "--working_dir", type = "character", help = "T
 pa <- argparser::add_argument(pa, "--result_id", type = "character", help = "The result_id")
 pa <- argparser::parse_args(pa)
 # pa <- argparser::parse_args(pa, argv = r"(
-#                             --data_id f1809110732c2-e5f290978d2e2
+#                             --data_id 337dc3137fe9d-e5f290978d2e2
 #                             --dataset_config kang
-#                             --integration_id 8e4417d74d625-1e9271d3f54d6
+#                             --integration_id 7a118bf7498c0-33b38b15c9f6e
+#                             --reference_id 42a82ea22a4a9-33b38b15c9f6e
 #                             --working_dir /scratch/ahlmanne/lemur_benchmark
 # )" |> stringr::str_trim() |> stringr::str_split("\\s+"))
 
@@ -183,6 +208,10 @@ ref_is_gr1 <- colData(sce)[[config$main_covariate]] == config$contrast[1]
 ref_celltypes <- colData(sce)[[config$cell_type_column]]
 ref_embedding <- as.matrix(data.table::fread(train_file, sep = "\t", header = FALSE, col.names = colnames(sce)))
 
+noint_embedding <- file.path(pa$working_dir, "results", pa$reference_id, "train-embedding.tsv") |>
+  data.table::fread(sep = "\t", header = FALSE, col.names = colnames(sce)) |>
+  as.matrix()
+
 # Bring all data to the same scale
 rm <- rowMeans(ref_embedding)
 ref_embedding <- ref_embedding - rm
@@ -191,17 +220,22 @@ ref_embedding <- ref_embedding / scale_factor + rm
 
 res1 <- calculate_metrics(ref_embedding, ref_embedding, ref_is_gr1, ref_is_gr1)
 res1 <- c(res1, structure_conservation(assay(sce, config$assay_continuous), ref_embedding, ref_is_gr1))
+res1 <- c(res1, overlap_score(ref_embedding, noint_embedding, ref_is_gr1))
 res1 <- c(res1, signal_to_noise_ratio(ref_embedding, ref_is_gr1, ref_celltypes))
 res1$comparison <- "train_vs_train"
 
 res <- if(file.exists(holdout_file)){
   embedding <- as.matrix(data.table::fread(holdout_file, sep = "\t", header = FALSE, col.names = colnames(holdout)))
   embedding <- (embedding - rm) / scale_factor + rm
+  noint_holdout_embedding <- file.path(pa$working_dir, "results", pa$reference_id, "holdout-embedding.tsv") |>
+    data.table::fread(sep = "\t", header = FALSE, col.names = colnames(holdout)) |>
+    as.matrix()
   
   is_gr1 <- colData(holdout)[[config$main_covariate]] == config$contrast[1]
   celltypes <- colData(holdout)[[config$cell_type_column]]
   res2 <- calculate_metrics(embedding, ref_embedding, is_gr1, ref_is_gr1)  
   res2 <- c(res2, structure_conservation(assay(holdout, config$assay_continuous), embedding, is_gr1))
+  res2 <- c(res2, overlap_score(embedding, noint_holdout_embedding, is_gr1))
   res2 <- c(res2, signal_to_noise_ratio(embedding, is_gr1, celltypes))
   
   res2$comparison <- "holdout_vs_train"  

@@ -10,21 +10,31 @@ names(datasets) <- datasets
 
 make_integration_jobs <- function(dataset, variation = "small"){
   mem <- if(dataset %in% c("reyfman","mouse_gastrulation", "hrvatin", "goldfarbmuren"))  "160GB" else "40GB"
-  job <- prepare_data(list(dataset = dataset,  variation = variation), memory = mem) 
+  data_job <- prepare_data(list(dataset = dataset,  variation = variation), memory = mem) 
   
-  default_params <- list(data_id = job$result_id, dataset_config = dataset)
-  integration_jobs <- list(
-    CPA_large = cpa_integration_prediction(c(default_params, list(n_latent = 64, max_epochs = 2000)), dep_job = job, memory = mem),
-    CPA_kangparams = cpa_kang_params_integration_prediction(default_params, dep_job = job, memory = mem),
-    scvi = scvi_integration_prediction(default_params, dep_job = job, memory = mem),
-    harmony = harmony_integration(default_params, dep_job = job, memory = mem),
-    PCA = pca_integration_prediction(default_params, dep_job = job, memory = mem),
-    lemur = lemur_integration_prediction(default_params, dep_job = job, memory = mem),
-    invertible_harmony = lemur_integration_prediction(c(default_params, list(skip_multi_cond_pca = "true")), dep_job = job, memory = mem),
-    multiCondPCA = lemur_integration_prediction(c(default_params, list(skip_alignment = "true")), dep_job = job, memory = mem)
+  default_params <- list(data_id = data_job$result_id, dataset_config = dataset)
+  ref_jobs <- list(
+    CPA_ref = cpa_on_counts_integration_prediction(c(default_params, list("no_integration"="")), dep_job = data_job, memory = mem),
+    scvi_ref = scvi_integration_prediction(c(default_params, list("no_integration"="")), dep_job = data_job, memory = mem),
+    PCA_ref = pca_integration_prediction(default_params, dep_job = data_job, memory = mem)
   )
-  eval_jobs <- map(integration_jobs, \(x){
-    evaluate_integration(list(data_id = job$result_id, dataset_config = dataset, integration_id = x$result_id), dep_jobs = list(job, x))
+  
+  integration_jobs <- list(
+    CPA_kangparams = cpa_on_counts_integration_prediction(default_params, dep_job = data_job, memory = mem),
+    scvi = scvi_integration_prediction(default_params, dep_job = data_job, memory = mem),
+    harmony = harmony_integration(default_params, dep_job = data_job, memory = mem),
+    PCA = pca_integration_prediction(default_params, dep_job = data_job, memory = mem),
+    lemur = lemur_integration_prediction(default_params, dep_job = data_job, memory = mem),
+    invertible_harmony = lemur_integration_prediction(c(default_params, list(skip_multi_cond_pca = "true")), dep_job = data_job, memory = mem),
+    multiCondPCA = lemur_integration_prediction(c(default_params, list(skip_alignment = "true")), dep_job = data_job, memory = mem)
+  )
+  eval_jobs <- map2(integration_jobs, names(integration_jobs), \(job, n){
+    ref_job <- if(n == "CPA_kangparams") ref_jobs[["CPA_ref"]]
+    else if(n == "scvi") ref_jobs[["scvi_ref"]]
+    else ref_jobs[["PCA_ref"]]
+    evaluate_integration(list(data_id = data_job$result_id, dataset_config = dataset, 
+                              integration_id = job$result_id, reference_id = ref_job$result_id),
+                         dep_jobs = list(data_job, job, ref_job))
   })
   eval_jobs
 }
@@ -35,8 +45,7 @@ make_visualization_jobs <- function(dataset, variation = "small"){
   
   default_params <- list(data_id = job$result_id, dataset_config = dataset)
   integration_jobs <- list(
-    CPA_large = cpa_integration_prediction(c(default_params, list(n_latent = 64, max_epochs = 2000)), dep_job = job, memory = mem),
-    CPA_kangparams = cpa_kang_params_integration_prediction(default_params, dep_job = job, memory = mem),
+    CPA_kangparams = cpa_on_counts_integration_prediction(default_params, dep_job = job, memory = mem),
     scvi = scvi_integration_prediction(default_params, dep_job = job, memory = mem),
     harmony = harmony_integration(default_params, dep_job = job, memory = mem),
     PCA = pca_integration_prediction(default_params, dep_job = job, memory = mem),
