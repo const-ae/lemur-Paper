@@ -872,14 +872,14 @@
     },
     "MyWorkflowManager": {
       "Package": "MyWorkflowManager",
-      "Version": "0.2.0",
+      "Version": "0.2.1",
       "Source": "GitHub",
       "RemoteType": "github",
       "RemoteHost": "api.github.com",
       "RemoteUsername": "const-ae",
       "RemoteRepo": "MyWorkflowManager",
       "RemoteRef": "master",
-      "RemoteSha": "a0d7be787df989dbe05be5c630a0b677e0f87201",
+      "RemoteSha": "f3980f3a7ff9415731447b22d5bc4a1113d81c6a",
       "Requirements": [
         "digest",
         "glue",
@@ -888,7 +888,7 @@
         "stringr",
         "yaml"
       ],
-      "Hash": "10235eecb68d349925d88e4486ffe7cd"
+      "Hash": "269eb4791565299424effa7c09d814cf"
     },
     "ProtGenerics": {
       "Package": "ProtGenerics",
@@ -3056,14 +3056,14 @@
     },
     "glmGamPoi": {
       "Package": "glmGamPoi",
-      "Version": "1.13.3",
+      "Version": "1.17.3",
       "Source": "GitHub",
       "RemoteType": "github",
       "RemoteHost": "api.github.com",
       "RemoteUsername": "const-ae",
       "RemoteRepo": "glmGamPoi",
       "RemoteRef": "devel",
-      "RemoteSha": "63843f1da8b60c12bf597922f435b0a10a1f52ca",
+      "RemoteSha": "fda86eed9b205f55a9f365774f2c873694036f56",
       "Requirements": [
         "BiocGenerics",
         "DelayedArray",
@@ -3083,7 +3083,7 @@
         "utils",
         "vctrs"
       ],
-      "Hash": "14fd26470ec6c1e4a86c569c15bd3ad7"
+      "Hash": "7697ad9ee0f7db513749584520d2eaed"
     },
     "glmnet": {
       "Package": "glmnet",
@@ -5537,14 +5537,14 @@
     },
     "sparseMatrixStats": {
       "Package": "sparseMatrixStats",
-      "Version": "1.13.4",
+      "Version": "1.17.2",
       "Source": "GitHub",
       "RemoteType": "github",
       "RemoteHost": "api.github.com",
       "RemoteUsername": "const-ae",
       "RemoteRepo": "sparseMatrixStats",
       "RemoteRef": "devel",
-      "RemoteSha": "4c6e8142914b0c73de29830fa08ba2a52b202a08",
+      "RemoteSha": "da46dd6ce9bca58781ae20d7d44054df3542f339",
       "Requirements": [
         "Matrix",
         "MatrixGenerics",
@@ -5552,7 +5552,7 @@
         "matrixStats",
         "methods"
       ],
-      "Hash": "336cfb23f3efe9f49c42bd3ef06595cf"
+      "Hash": "37bdb014fecebaf6b3a0b8c3d0745a6d"
     },
     "spatstat.data": {
       "Package": "spatstat.data",
