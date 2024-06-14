@@ -96,7 +96,7 @@ mean_sd_agreement <- function(data, ref_data){
 
 mean_sd_agreement_per_celltype <- function(data, ref_data, cell_types, ref_cell_types){
   res <- as.list(colMeans(do.call(rbind, lapply(as.character(unique(cell_types)), \(ct){
-    unlist(mean_sd_agreement(data[,cell_types == ct,drop=FALSE], ref_data[,ref_cell_types == ct,drop=FALSE]))
+    unlist(mean_sd_agreement(data[,which(cell_types == ct),drop=FALSE], ref_data[,which(ref_cell_types == ct),drop=FALSE]))
   })), na.rm = TRUE))
   names(res) <- paste0(names(res), "_per_celltype")
   res

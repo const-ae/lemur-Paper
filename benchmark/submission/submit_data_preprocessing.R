@@ -16,6 +16,7 @@ make_integration_jobs <- function(dataset, variation = "small"){
   integration_jobs <- list(
     CPA_large = cpa_integration_prediction(c(default_params, list(n_latent = 64, max_epochs = 2000)), dep_job = job, memory = mem),
     CPA_kangparams = cpa_kang_params_integration_prediction(default_params, dep_job = job, memory = mem),
+    scvi = scvi_integration_prediction(default_params, dep_job = job, memory = mem),
     harmony = harmony_integration(default_params, dep_job = job, memory = mem),
     PCA = pca_integration_prediction(default_params, dep_job = job, memory = mem),
     lemur = lemur_integration_prediction(default_params, dep_job = job, memory = mem),
@@ -36,6 +37,7 @@ make_visualization_jobs <- function(dataset, variation = "small"){
   integration_jobs <- list(
     CPA_large = cpa_integration_prediction(c(default_params, list(n_latent = 64, max_epochs = 2000)), dep_job = job, memory = mem),
     CPA_kangparams = cpa_kang_params_integration_prediction(default_params, dep_job = job, memory = mem),
+    scvi = scvi_integration_prediction(default_params, dep_job = job, memory = mem),
     harmony = harmony_integration(default_params, dep_job = job, memory = mem),
     PCA = pca_integration_prediction(default_params, dep_job = job, memory = mem),
     lemur = lemur_integration_prediction(default_params, dep_job = job, memory = mem),
@@ -58,6 +60,7 @@ make_prediction_jobs <- function(dataset, variation = "small"){
     no_change = no_change_prediction(default_params, dep_job = job, memory = mem),
     CPA_large = cpa_integration_prediction(c(default_params, list(n_latent = 64, max_epochs = 2000)), dep_job = job, memory = mem),
     CPA_kangparams = cpa_kang_params_integration_prediction(default_params, dep_job = job, memory = mem),
+    scvi = scvi_integration_prediction(default_params, dep_job = job, memory = mem),
     PCA = pca_integration_prediction(default_params, dep_job = job, memory = mem),
     lemur = lemur_integration_prediction(default_params, dep_job = job, memory = mem),
     invertible_harmony = lemur_integration_prediction(c(default_params, list(skip_multi_cond_pca = "true")), dep_job = job, memory = mem),
@@ -143,7 +146,7 @@ plots <- vis_df %>%
   group_map(\(dat, key){
     dat %>%
       unnest(vis) %>%
-      sample_n(size = min(nrow(dat$vis[[1]]), 1e4)) %>%
+      # sample_n(size = min(nrow(dat$vis[[1]]), 1e4)) %>%
       ggplot(aes(x = umap1, y = umap2)) +
       ggrastr::rasterise(geom_point(aes(color = covariate), size = 0.3, stroke = 0), dpi = 300) +
       # geom_point(aes(color = covariate), size = 0.1, stroke = 0) +

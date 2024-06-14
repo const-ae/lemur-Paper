@@ -26,7 +26,7 @@ dataset_labels <- c("angelidis" = "Angelidis", "aztekin" = "Aztekin", "bunis" = 
 
 ```{r}
 method_labels <-  c("PCA" = "PCA", "harmony" = "Harmony", "invertible_harmony" = "Param. Harmony",
-                    "multiCondPCA" = "Rigid LEMUR", "lemur" = "LEMUR", "CPA" = "CPA")
+                    "multiCondPCA" = "Rigid LEMUR", "lemur" = "LEMUR", "CPA" = "CPA", "scvi" = "scVI")
 ```
 
 
@@ -40,8 +40,10 @@ int_data <- read_tsv(glue("../benchmark/output/integration_results-{variation}.t
 int_data
 ```
 
+
+
 ```{r}
-methods <- c("PCA", "harmony", "invertible_harmony", "multiCondPCA", "lemur", "CPA")
+methods <- c("PCA", "harmony", "invertible_harmony", "multiCondPCA", "lemur", "CPA", "scvi")
 setdiff(unique(int_data$method), methods)
 ```
 
@@ -55,66 +57,74 @@ perf_data <- int_data %>%
   pivot_longer(all_of(map_chr(int_metrics, rlang::as_name)), names_to = "metric") 
 ```
 
-
 ```{r}
 condition_labels <- c("holdout_vs_train" = "Holdout", "train_vs_train" = "Training")
-
-suppl_int_signal_plt <- perf_data %>%
-  mutate(method = factor(method, levels = methods)) %>%
-  filter(metric %in% c("ARI",  "AMI", "NMI", "celltypeSS_over_totalSS")) %>%
-  mutate(metric = factor(metric, levels = c("ARI",  "AMI", "NMI", "celltypeSS_over_totalSS"),
-                         labels = c("ARI", "AMI", "NMI", "Var. Expl.\nCell type"))) %>%
-  ggplot(aes(x = method, y = value)) +
-    geom_point(aes(color = comparison), size = 0.4) +
-    ggh4x::facet_grid2(vars(metric), vars(data), scales = "free_y", labeller = labeller(data = as_labeller(dataset_labels)), 
-               strip = ggh4x::strip_vanilla(clip = "off")) +
-    scale_x_discrete(labels = method_labels) +
-    scale_color_discrete(labels = condition_labels) +
-    guides(x = guide_axis(angle = 90)) +
-    theme(panel.grid.major.y = element_line(colour = "grey50"), axis.title = element_blank(),
-          panel.spacing.y = unit(5, "mm")) +
-    labs(title = "(B) Biological signal retention")
 
 suppl_int_mix_plt <- perf_data %>%
   mutate(method = factor(method, levels = methods)) %>%
   filter(metric %in% c("mmd", "wasserstein", "mix", "batchSS_over_totalSS")) %>%
   mutate(metric = factor(metric, levels = c("mix", "mmd", "wasserstein", "batchSS_over_totalSS"),
-                         labels = c("kNN Mix", "$\\log$ MMD", "Wasserstein",  "Var. Expl.\nCondition"))) %>%
+                         labels = c("kNN Mix $\\uparrow$", "$\\log$ MMD $\\downarrow$", "Wasserstein $\\downarrow$",  "Var. explained by condition $\\downarrow$"))) %>%
   ggplot(aes(x = method, y = value)) +
-    geom_point(aes(color = comparison), size = 0.4) +
-    ggh4x::facet_grid2(vars(metric), vars(data), scales = "free_y", labeller = labeller(data = as_labeller(dataset_labels)), 
-               strip = ggh4x::strip_vanilla(clip = "off")) +
+    ggbeeswarm::geom_quasirandom(size = 0.4, width = 0.3) +
+    stat_summary(geom = "pointrange", fun.data = mean_se, color = "red", size = 1, fatten = 1) +
+    ggh4x::facet_grid2(vars(comparison), vars(metric), scales = "free_y", independent = "y",
+                       labeller = labeller(comparison = as_labeller(condition_labels)),
+                       strip = ggh4x::strip_vanilla(clip = "off")) +
     scale_x_discrete(labels = method_labels) +
+    scale_y_continuous(breaks = scales::breaks_extended(n = 3)) +
     scale_color_discrete(labels = condition_labels) +
     guides(x = guide_axis(angle = 90)) +
     theme(panel.grid.major.y = element_line(colour = "grey50"), axis.title = element_blank(),
           panel.spacing.y = unit(5, "mm")) +
     labs(title = "(A) Integration of conditions")
 
+suppl_int_signal_plt <- perf_data %>%
+  mutate(method = factor(method, levels = methods)) %>%
+  filter(metric %in% c("ARI",  "AMI", "NMI", "celltypeSS_over_totalSS")) %>%
+  mutate(metric = factor(metric, levels = c("ARI",  "AMI", "NMI", "celltypeSS_over_totalSS"),
+                         labels = c("ARI $\\uparrow$", "AMI $\\uparrow$", "NMI $\\uparrow$", "Var. explained by cell type $\\uparrow$"))) %>%
+  ggplot(aes(x = method, y = value)) +
+    ggbeeswarm::geom_quasirandom(size = 0.4, width = 0.3) +
+    stat_summary(geom = "pointrange", fun.data = mean_se, color = "red", size = 1, fatten = 1) +
+    ggh4x::facet_grid2(vars(comparison), vars(metric), scales = "free_y", independent = "y",
+                       labeller = labeller(comparison = as_labeller(condition_labels)),
+                       strip = ggh4x::strip_vanilla(clip = "off")) +
+    scale_x_discrete(labels = method_labels) +
+    scale_y_continuous(breaks = c(0, 0.5, 1), limits = c(0, 1), expand = expansion(add = 0)) +
+    guides(x = guide_axis(angle = 90)) +
+    theme(panel.grid.major.y = element_line(colour = "grey50"), axis.title = element_blank(),
+          panel.spacing.y = unit(5, "mm")) +
+    labs(title = "(B) Biological signal retention")
+
 suppl_int_ss_plt <- perf_data %>%
   mutate(method = factor(method, levels = methods)) %>%
   filter(metric %in% c("celltypeSS_over_totalSS", "batchSS_over_totalSS")) %>%
   pivot_wider(id_cols = c(data, method, comparison), names_from = metric, values_from = value) %>%
   mutate(rel_SS = batchSS_over_totalSS / celltypeSS_over_totalSS) %>%
+  mutate(metric = "$\\downarrow$") %>%
   ggplot(aes(x = method, y = rel_SS)) +
-    geom_point(aes(color = comparison), size = 0.4) +
-    ggh4x::facet_wrap2(vars(data), scales = "fixed", labeller = labeller(data = as_labeller(dataset_labels)),
-                       strip = ggh4x::strip_vanilla(clip = "off"), nrow = 1) +
+    ggbeeswarm::geom_quasirandom(size = 0.4, width = 0.3) +
+    stat_summary(geom = "pointrange", fun.data = mean_se, color = "red", size = 1, fatten = 1) +
+    ggh4x::facet_grid2(vars(comparison), vars(metric), scales = "free_y", independent = "y",
+                       labeller = labeller(comparison = as_labeller(condition_labels)),
+                       strip = ggh4x::strip_vanilla(clip = "off")) +
     scale_x_discrete(labels = method_labels) +
+    scale_y_log10(breaks = c(0.1, 1e-3, 1e-5), labels = paste0("$10^{", c(-1, -3, -5), "}$"), 
+                  limits = c(1e-5, 0.3), expand = expansion(mult = 0)) +
     scale_color_discrete(labels = condition_labels) +
     guides(x = guide_axis(angle = 90)) +
-    theme(panel.grid.major.y = element_line(colour = "grey50"), axis.title = element_blank()) +
-    labs(title = "(C) Ration of variance explained $\\frac{\\text{condition}}{\\text{cell type}}$")
-
+    theme(panel.grid.major.y = element_line(colour = "grey50"), axis.title = element_blank(),
+          panel.spacing.y = unit(5, "mm")) +
+    labs(title = "(C) Ratio of variance explained $\\frac{\\text{condition}}{\\text{cell type}}$ (log-scale)") 
+  
 
 plot_assemble(
-  add_plot(suppl_int_mix_plt  + guides(color = "none"), x = 0, y = 0, width = 200, height = 80),
-  add_plot(suppl_int_signal_plt + guides(color = "none"), x = 0, y = 80, width = 200, height = 80),
-  add_plot(suppl_int_ss_plt + guides(color = "none"), x = 0, y = 160, width = 200, height = 40),
-  add_plot(cowplot::get_legend(suppl_int_ss_plt + labs(color = "") + theme(legend.position = "bottom")), x = 0, y = 200, height = 10, width = 50),
-
+  add_plot(suppl_int_mix_plt  + guides(color = "none"), x = 0, y = 0, width = 170, height = 60),
+  add_plot(suppl_int_signal_plt + guides(color = "none"), x = 0, y = 60, width = 170, height = 60),
+  add_plot(suppl_int_ss_plt + guides(color = "none"), x = 0, y = 120, width = 46, height = 60),
   
-  width = 200, height = 210, units = "mm", show_grid_lines = FALSE,
+  width = 170, height = 180, units = "mm", show_grid_lines = FALSE,
   latex_support = TRUE, filename = "../plots/suppl_integration_all_metrics.pdf"
 )
 
@@ -153,8 +163,8 @@ int_bio_df <- left_join(int_data %>%  dplyr::select(data, method, comparison, mi
             dplyr::rename(ARI = value) %>%
             dplyr::select(-metric), by = c("data", "method", "comparison")) %>%
   filter(comparison == "holdout_vs_train" | method == "harmony") %>%
-  filter(method %in% c("PCA", "harmony", "lemur", "CPA")) %>%
-  mutate(method = factor(method, c("lemur", "PCA", "harmony", "CPA"))) %>%
+  filter(method %in% c("PCA", "harmony", "lemur", "CPA", "scvi")) %>%
+  mutate(method = factor(method, c("lemur", "PCA", "harmony", "CPA", "scvi"))) %>%
   mutate(avg_mix = mean(mix),
          avg_ARI = mean(ARI), .by = c(data)) 
   
@@ -167,7 +177,7 @@ int_bio_pl <- int_bio_df %>%
   unnest(value) %>%
   ggplot(aes(x = value[,1], y = value[,2])) +
     geom_density2d(aes(color = method), adjust = 3, contour_var = "ndensity", breaks = seq(0.9, 0.2, length.out = 3)) +
-    # geom_point(data = int_bio_df, aes(x =  mix / avg_mix, y = ARI / avg_ARI, color = stage(method, after_scale = colorspace::lighten(colour, 0.3))), size = 0.1) +
+    geom_point(data = int_bio_df, aes(x =  mix / avg_mix, y = ARI / avg_ARI, color = stage(method, after_scale = colorspace::lighten(colour, 0.3))), alpha = 0.3, size = 0.1) +
     ggrepel::geom_text_repel(data = . %>% summarize(value = matrix(colMeans(value), nrow = 1), .by = method), aes(label = method_labels[method]), 
                              size = font_size_small / .pt, point.padding = unit(3, "mm") ) +
     annotation_custom(grid::polylineGrob(x = c(0.91, 0.99), y = c(0.91, 0.99), gp = grid::gpar(fill = "black"), arrow =  grid::arrow(ends = "last", type = "closed", angle = 20, length = unit(10 / 7, "mm")))) +
@@ -194,13 +204,13 @@ kang_umap_annot_df <- perf_data %>%
   filter(data == "kang") %>%
   filter(metric %in% c("ARI", "mix")) %>%
   filter(comparison == "holdout_vs_train" | method == "harmony") %>%
-  filter(method %in% c("PCA", "harmony", "lemur", "CPA")) %>%
-  mutate(method = factor(method, c("lemur", "PCA", "harmony", "CPA"))) %>%
+  filter(method %in% c("PCA", "harmony", "lemur", "CPA", "scvi")) %>%
+  mutate(method = factor(method, c("lemur", "PCA", "harmony", "CPA", "scvi"))) %>%
   pivot_wider(names_from = "metric", values_from = "value")
 
 kang_plot <- kang_vis %>%
-  filter(method %in% c("PCA", "harmony", "lemur", "CPA")) %>%
-  mutate(method = factor(method, c("lemur", "PCA", "harmony", "CPA"))) %>%
+  filter(method %in% c("PCA", "harmony", "lemur", "CPA", "scvi")) %>%
+  mutate(method = factor(method, c("lemur", "PCA", "harmony", "CPA", "scvi"))) %>%
   mutate(is_holdout = ! is.na(is_holdout) & is_holdout) %>%
   sample_frac(n = 1) %>%
   ggplot(aes(x = umap1, y = umap2)) +
@@ -210,7 +220,7 @@ kang_plot <- kang_vis %>%
     geom_text(data = kang_umap_annot_df, aes(x = 0, y = Inf, label = glue("$\\textrm{{ARI}} = {sprintf('%.2f', ARI)}$")), 
             size = font_size_small / .pt, hjust = 0.5, vjust = 3) +
     scale_color_manual(values = c("ctrl" = "#FC8D62", "stim" = "#8DA0CB")) +
-    facet_wrap(vars(method), nrow = 1, labeller = as_labeller(c("lemur" = "LEMUR", "CPA" = "CPA", "PCA" = "PCA", "harmony" = "Harmony"))) +
+    facet_wrap(vars(method), nrow = 1, labeller = as_labeller(c("lemur" = "LEMUR", "CPA" = "CPA", "PCA" = "PCA", "harmony" = "Harmony", "scvi" = "scVI"))) +
     guides(color = guide_legend(override.aes = list(size = 2))) +
     small_axis(label = "UMAP", fontsize = font_size_small) +
     labs(color = "Cell condition",
@@ -245,78 +255,109 @@ pred_data <- read_tsv(glue("../benchmark/output/prediction_results-{variation}.t
 ```
 
 ```{r}
-pred_methods <- c("linear", "PCA", "harmony", "invertible_harmony", "multiCondPCA", "lemur", "CPA", "no_change")
+pred_methods <- c("linear", "PCA", "harmony", "invertible_harmony", "multiCondPCA", "lemur", "CPA", "scvi", "no_change")
 pred_method_labels <-  c("linear" = "Linear", "PCA" = "PCA", "harmony" = "Harmony", "invertible_harmony" = "Param. Harmony",
-                    "multiCondPCA" = "Rigid LEMUR", "lemur" = "LEMUR", "CPA" = "CPA", "no_change" = "Identity")
+                    "multiCondPCA" = "Rigid LEMUR", "lemur" = "LEMUR", "CPA" = "CPA", "scvi" = "scVI", "no_change" = "Identity")
 pred_metrics <- c("l2_mean", "l2_mean_per_celltype", "l2_sd", "l2_sd_per_celltype", "r2_mean",
                          "r2_mean_per_celltype", "r2_sd", "r2_sd_per_celltype", "mmd", "wasserstein")
-pred_metrics_labels <- c("l2_mean" = "$L_2$ mean", "l2_mean_per_celltype" = "$L_2$ mean\ncell type", "l2_sd" = "$L_2$ of S.D.",
-                  "l2_sd_per_celltype" = "$L_2$ of S.D.\ncell type", "mmd" = "$\\log$ MMD", "r2_mean" = "$R^2$ mean",
-                  "r2_mean_per_celltype" = "$R^2$ mean\ncell type", "r2_sd" = "$R^2$ of S.D.",
-                  "r2_sd_per_celltype" = "$R^2$ of S.D.\ncell type", "wasserstein" = "Wasserstein\ndistance")
-```
-
-```{r, paged.print = FALSE}
-supl_pred_df <- pred_data %>%
-  dplyr::select(-starts_with("stat-")) %>%
-  mutate(mmd = log(mmd)) %>%
-  pivot_longer(-c(method, job, data, status, comparison), names_to = "metric") %>%
-  mutate(method = factor(method, levels = pred_methods)) %>%
-  mutate(metric = factor(metric, levels = pred_metrics)) %>%
-  mutate(is_perf = ifelse(str_starts(comparison, "holdout"), "holdout", "training")) 
-  
-make_supl_pred_plot <- function(data){
-  ggplot(data, aes(x = method, y = value)) +
-    ggbeeswarm::geom_quasirandom(aes(color = is_perf), width = 0.2, size = 0.4) +
-    ggh4x::facet_grid2(vars(metric), vars(data), scales = "free_y", independent = "y",
-                       labeller = labeller(metric = as_labeller(pred_metrics_labels), data = as_labeller(dataset_labels)),
-                       strip = ggh4x::strip_vanilla(clip = "off")) +
-    scale_x_discrete(labels = pred_method_labels) +
-    scale_y_continuous(breaks = scales::breaks_pretty(n = 3)) +
-    guides(x = guide_axis(angle = 90)) +
-    labs(color = "") +
-    theme(panel.grid.major.y = element_line(colour = "grey50"), axis.title = element_blank(),
-          panel.spacing.y = unit(5, "mm"), strip.text.y = element_text(size = font_size_tiny)) 
-}
-
-pl1 <- supl_pred_df %>%
-  filter(as.integer(as.factor(data)) <= 7) %>%
-  make_supl_pred_plot()
-
-pl2 <- supl_pred_df %>%
-  filter(as.integer(as.factor(data)) > 7) %>%
-  make_supl_pred_plot()
-
-
-plot_assemble(
-  add_plot(pl1 + guides(color = "none"), x = 0, y = 0, width = 170, height = 120),
-  add_plot(pl2 , x = 0, y = 125, width = 160, height = 120),
-  
-  width = 170, height = 245, units = "mm", show_grid_lines = FALSE,
-  latex_support = TRUE, filename = "../plots/suppl_prediction_all_metrics.pdf"
-)
-
-
-
+pred_metrics_labels <- c("l2_mean" = "$L_2$ over all cells $\\downarrow$", "l2_mean_per_celltype" = "$L_2$ per cell type $\\downarrow$",
+                         "l2_sd" = "$L_2$ of S.D. over all cells $\\downarrow$", "l2_sd_per_celltype" = "$L_2$ of S.D. per cell type $\\downarrow$",
+                         "mmd" = "$\\log$ MMD $\\downarrow$", "r2_mean" = "$R^2$ over all cells $\\uparrow$", 
+                         "r2_mean_per_celltype" = "$R^2$ per cell type $\\uparrow$", "r2_sd" = "$R^2$ of S.D. over all cells $\\uparrow$",
+                         "r2_sd_per_celltype" = "$R^2$ of S.D. per cell type $\\uparrow$", "wasserstein" = "Wasserstein distance $\\downarrow$")
 ```
 
 
 ```{r, paged.print = FALSE}
 pred_data_long <- pred_data %>%
   dplyr::select(data, method, comparison, mmd, wasserstein, starts_with("l2"), starts_with("r2")) %>%
-  pivot_longer(c( mmd, wasserstein, starts_with("l2"), starts_with("r2")), names_to = "metric") 
+  mutate(mmd = log10(mmd)) %>%
+  pivot_longer(c(mmd, wasserstein, starts_with("l2"), starts_with("r2")), names_to = "metric") 
 ```
+
+```{r, paged.print=FALSE}
+norm_metric <- c("l2_mean", "l2_mean_per_celltype", "l2_sd", "l2_sd_per_celltype", "wasserstein")
+
+full_data_rel <- pred_data_long %>%
+  mutate(mean_value = mean(value, na.rm=TRUE), .by = c(data, metric)) %>%
+  mutate(rel_perf = value / mean_value) %>%
+  mutate(method = factor(method, levels = pred_methods)) %>%
+  mutate(metric = factor(metric, levels = pred_metrics)) %>%
+  mutate(is_perf = ifelse(str_starts(comparison, "holdout"), "holdout", "training")) 
+
+pl1 <- full_data_rel %>%
+  filter(metric %in% norm_metric) %>%
+  mutate(rel_perf = ifelse(rel_perf > 2.5, Inf, rel_perf)) %>%
+  ggplot(aes(x = method, y = rel_perf)) +
+    geom_hline(yintercept = 1) +
+    # geom_point(data = . %>% filter(is.infinite(rel_perf)), size = 0.2) +  # filtering breaks the x-axis order thus hack alpha
+    geom_point(aes(alpha = is.infinite(rel_perf) * 1.0), size = 0.2, show.legend = FALSE) +
+    ggbeeswarm::geom_quasirandom(size = 0.2) +
+    geom_pointrange(data = full_data_rel %>% filter(metric %in% norm_metric) %>% summarize(rel_perf = mean_se(rel_perf), .by = c(method, metric)),
+                    aes(y = rel_perf$y, ymin = rel_perf$ymin, ymax = rel_perf$ymax), color = "red", fatten = 1, size = 1) +
+    facet_grid(vars(is_perf), vars(metric), labeller = labeller(metric = as_labeller(pred_metrics_labels))) +
+    scale_x_discrete(labels = pred_method_labels, breaks = pred_methods) +
+    scale_y_continuous(breaks = c(0, 1, 2, 2.6), labels = c(0, 1, 2, "$>$2.5"), limits = c(0, 2.6), expand = expansion(add = 0)) +
+    scale_alpha_identity() +
+    coord_cartesian(clip = "off") +
+    guides(x = guide_axis(angle = 90)) +
+    theme(axis.title.x = element_blank(), plot.title.position = "plot", 
+          panel.spacing.y = unit(5, "mm")) +
+    labs(title = "(A) Distances between predicted and observed expression", y = "distance (normalized per dataset)")
+
+pl2 <- full_data_rel %>%
+  filter(str_starts(metric, "r2")) %>%
+  mutate(value = ifelse(value < 0.5, -Inf, value)) %>%
+  ggplot(aes(x = method, y = value)) +
+    # geom_point(data = . %>% filter(is.infinite(rel_perf)), size = 0.2) +  # filtering breaks the x-axis order thus hack alpha
+    geom_point(aes(alpha = is.infinite(rel_perf) * 1.0), size = 0.2, show.legend = FALSE) +
+    ggbeeswarm::geom_quasirandom(size = 0.2) +
+    geom_pointrange(data = full_data_rel %>% filter(str_starts(metric, "r2")) %>% summarize(value = mean_se(value), .by = c(method, metric)),
+                    aes(y = value$y, ymin = value$ymin, ymax = value$ymax), color = "red", fatten = 1, size = 1) +
+    facet_grid(vars(is_perf), vars(metric), scales = "free_y", labeller = labeller(metric = as_labeller(pred_metrics_labels))) +
+    scale_x_discrete(labels = pred_method_labels) +
+    scale_y_continuous(breaks = c(0.5, 0.75, 1), labels = c("$<$0.5", 0.75, 1), limits = c(0.5, 1), expand = expansion(add = 0)) +
+    coord_cartesian(clip = "off") +
+    guides(x = guide_axis(angle = 90)) +
+    theme(axis.title.x = element_blank(), plot.title.position = "plot",
+          strip.text.y.right =  element_blank(), panel.spacing.y = unit(5, "mm")) +
+    labs(title = "(B) Correlation and maximum mean discrepancy between predicted and observed expression", y = "correlation")
+
+pl3 <- full_data_rel %>%
+  filter(metric == "mmd") %>%
+  ggplot(aes(x = method, y = value)) +
+    ggbeeswarm::geom_quasirandom(size = 0.2) +
+    geom_pointrange(data = full_data_rel %>% filter(metric == "mmd") %>% summarize(value = mean_se(value), .by = c(method, metric)),
+                    aes(y = value$y, ymin = value$ymin, ymax = value$ymax), color = "red", fatten = 1, size = 1) +
+    facet_grid(vars(is_perf), vars(metric), scales = "free_y", labeller = labeller(metric = as_labeller(pred_metrics_labels))) +
+    scale_x_discrete(labels = pred_method_labels) +
+    coord_cartesian(clip = "off") +
+    guides(x = guide_axis(angle = 90)) +
+    theme(axis.title = element_blank(), plot.title.position = "plot", 
+          panel.spacing.y = unit(5, "mm")) +
+    labs(title = " ")
+
+plot_assemble(
+  add_plot(pl1, x = 0, y = 0, width = 164, height = 60),
+  add_plot(pl2 , x = 0, y = 60, width = 131, height = 60),
+  add_plot(pl3, x = 131, y = 60, width = 37, height = 60),
+  width = 170, height = 120, units = "mm", show_grid_lines = FALSE,
+  latex_support = TRUE, filename = "../plots/suppl_prediction_all_metrics.pdf"
+)
+
+```
+
 
 
 
 ```{r, paged.print = FALSE}
 perf_pred_plot <- pred_data_long %>%
-  filter(metric %in% c("l2_mean", "l2_mean_per_celltype")) %>%
+  filter(metric %in% c("l2_mean_per_celltype")) %>%
   filter(str_starts(comparison, "holdout[12]_")) %>%
-  filter(method %in% c("no_change", "lemur", "CPA")) %>%
-  mutate(method = factor(method, c("lemur", "no_change", "CPA"))) %>%
+  filter(method %in% c("no_change", "lemur", "CPA", "scvi")) %>%
+  mutate(method = factor(method, c("lemur", "no_change", "CPA", "scvi"))) %>%
   mutate(method = fct_rev(method)) %>%
-  mutate(metric = factor(metric, levels = c("l2_mean", "l2_mean_per_celltype"))) %>%
+  mutate(metric = factor(metric, levels = c("l2_mean_per_celltype"))) %>%
   mutate(mean_value = mean(value), .by = c(data, metric)) %>%
   mutate(rel_perf = value / mean_value) %>%
   ggplot(aes(x = rel_perf, y = method)) +
@@ -324,8 +365,7 @@ perf_pred_plot <- pred_data_long %>%
     ggbeeswarm::geom_quasirandom(color = "grey", width = 0.2, size = 0.5) +
     stat_summary(geom = "pointrange", fun.data = mean_se, color = "red", size = 0.4) +
     small_arrow(position = c(0.1, 0.01), offset = 0.03) +
-    facet_wrap(vars(metric), nrow = 2,  labeller = as_labeller(c("l2_mean" = "Overall error\n($L_2$ distance)", 
-                                                                 "l2_mean_per_celltype" = "Error per cell type\n(Mean $L_2$ distance)"))) +
+    facet_wrap(vars(metric), labeller = as_labeller(c("l2_mean_per_celltype" = "Error per cell type\n(Mean $L_2$ distance)"))) +
     scale_x_continuous(expand = expansion(mult = c(0, 0.1)), breaks = c(0, 1, 2)) +
     scale_y_discrete(labels = c("lemur" = "LEMUR", "CPA" = "CPA", "no_change" = "Identity")) +
     coord_cartesian(xlim = c(0, 2)) +
@@ -350,20 +390,20 @@ l2_mean_dist_df <- pred_data_long %>%
   filter(metric == "l2_mean_per_celltype") %>% 
   filter(comparison == "holdout2_vs_obs2") %>%
   dplyr::rename(method.pred = method) %>%
-  filter(method.pred %in% c("no_change", "lemur", "CPA")) %>%
-  mutate(method.pred = factor(method.pred, c("lemur", "no_change", "CPA")))
+  filter(method.pred %in% c("no_change", "lemur", "CPA", "scvi")) %>%
+  mutate(method.pred = factor(method.pred, c("lemur", "no_change", "CPA", "scvi")))
 
 ct_scatter_plot <- tidylog::inner_join(filter(kang_pred, method != "obs"),
            filter(kang_pred, method == "obs"), by = c("gene", "condition", "cell_type"), suffix = c(".pred", ".obs")) %>%
-  filter(method.pred %in% c("no_change", "lemur", "CPA")) %>%
+  filter(method.pred %in% c("no_change", "lemur", "CPA", "scvi")) %>%
   filter(condition == "stim") %>%
-  mutate(method.pred = factor(method.pred, c("lemur", "no_change", "CPA"))) %>%
+  mutate(method.pred = factor(method.pred, c("lemur", "no_change", "CPA", "scvi"))) %>%
   ggplot(aes(x = expression.obs, y = expression.pred)) +
     geom_abline() +
     ggrastr::rasterize(geom_point(aes(color = cell_type), size = 0.4, stroke = 0), dpi = 300) +
     geom_text(data = l2_mean_dist_df, aes(x = 12, y = 22, label = glue("$L_2 = {sprintf('%.2f', value)}$")), 
               size = font_size_small / .pt, halign = 0.5, ) +
-    facet_wrap(vars(method.pred), nrow = 1, labeller = as_labeller(c("lemur" = "LEMUR", "CPA" = "CPA", "no_change" = "Identity"))) +
+    facet_wrap(vars(method.pred), nrow = 1, labeller = as_labeller(c("lemur" = "LEMUR", "CPA" = "CPA", "scvi" = "scVI", "no_change" = "Identity"))) +
     guides(color = guide_legend(override.aes = list(size = 2))) +
     coord_fixed() +
     labs(color = "",
@@ -484,8 +524,9 @@ prec_recall_plot <- prec_recall_df %>%
     scale_size_manual(values = c("special" = 0.7, "signif" = 0.4, "not signif" = 0.1)) +
     guides(color = guide_legend(override.aes = list(alpha = 1, size = 1.5)), size = "none") +
     coord_cartesian(clip = "off") +
-    labs(title = "(H) Neighborhood Precision and Recall",
-         subtitle = "Overlap of  neighborhood and simulated ground truth", 
+    labs(title = "(H) Overlap of neighborhoods with ground truth",
+         subtitle = paste0("Precision: fraction of neighborhood inside ground truth\n",
+                           "Recall: fraction of ground truth inside neighborhood"), 
          color = "", x = "Recall", y = "Precision") +
     theme(plot.title.position = "plot", legend.position = "bottom")
 
@@ -765,10 +806,10 @@ plot_assemble(
   add_text("(B) Integration Performance", x = 111.5, y = 1.5, fontsize = font_size, vjust = 1, fontface = "bold"),
   add_plot(int_bio_pl, x = 110, y = 5, width = 60, height = 45),
 
-  add_plot(kang_plot_cell_type, x = 0, y = 50, width = 30, height = 37),
-  add_plot(ct_scatter_plot + guides(color = "none"), x = 27, y = 50, width = 83, height = 40),
+  # add_plot(kang_plot_cell_type, x = 0, y = 50, width = 30, height = 37),
+  add_plot(ct_scatter_plot + guides(color = "none"), x = 0, y = 50, width = 110, height = 40),
   add_plot(cowplot::get_legend(ct_scatter_plot) , x = 10, y = 88, width = 75, height = 10),
-  add_plot(perf_pred_plot, x = 110, y = 50, width = 60, height = 50),
+  add_plot(perf_pred_plot, x = 110, y = 50, width = 60, height = 40),
   
   add_text("(F) Simulated DE", x = 2.7, y = 101.4, fontsize = font_size, vjust = 1, fontface = "bold"),
   add_plot(de_simulated_pl, x = 0, y = 100, width = 30, height = 45),

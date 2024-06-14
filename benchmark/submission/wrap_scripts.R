@@ -55,6 +55,12 @@ cpa_kang_params_integration_prediction <- function(params, dep_job, duration = "
                                  extra_args = "cpa_env", duration = duration, memory = memory)
 }
 
+scvi_integration_prediction <- function(params, dep_job, duration = "24:00:00", memory = "80GB"){
+  MyWorkflowManager::wrap_script("src/run_scvi.py", params = params, 
+                                 dependencies = list(dep_job), executor = "python",
+                                 extra_args = "scvi_env2", duration = duration, memory = memory)
+}
+
 #------------------------------------------------------------------------------------------------------
 
 
