@@ -20,18 +20,18 @@ cond_assign <- sample(c("control", "treated"), size = n_cells, replace = TRUE)
 mm <- model.matrix(~ celltype_assign * cond_assign - 1)
 
 celltype_centers <- cbind(c(-2, 3), c(5, 1))
-treat_eff <- cbind(c(0.3, -2), c(-1, 5.5))
+treat_eff <- cbind(c(-1.8, 0.2), c(1.5, 3.5))
 
 Y_mean <- cbind(celltype_centers, treat_eff) %*% t(mm)
-Y <- Y_mean + rnorm(n_cells * 2, sd = 0.2)
+Y <- (Y_mean + rnorm(n_cells * 2, sd = 0.2)) / 2
 
-plot(t(Y))
+plot(t(Y), col = as.factor(cond_assign))
 ```
 
 
 ```{r}
-fit <- lemur::lemur(Y, design = ~ cond_assign - 1, n_embedding = 1)
-fit <- lemur::align_harmony(fit, design = ~ cond_assign, nclust = 2)
+fit <- lemur::lemur(Y, design = ~ cond_assign - 1, n_embedding = 1, test_fraction = 0)
+fit <- lemur::align_harmony(fit, design = ~ cond_assign - 1, nclust = 2)
 ```
 
 ```{r}
@@ -68,10 +68,10 @@ annotate_ticks <- function(origin = c(0,0), dir = c(1,0), at = seq(-10, 10), len
   geom_segment(data = dat, aes(x = start[,1], xend = end[,1], y = start[,2], yend = end[,2]), ...)
 }
 
-annotate_labels_along <- function(origin = c(0,0), dir = c(1,0), labels = "", at = 0, offset = 0, ...){
+annotate_labels_along <- function(origin = c(0,0), dir = c(1,0), labels = at, at = 0, offset = 0, extra_df = NULL, ...){
   orth_dir <- c(dir[2], -dir[1])
   pos <- t(lemur:::mply_dbl(at, \(t) origin + t * dir, ncol=2))
-  dat <- tibble(pos = t(pos), labels)
+  dat <- bind_cols(tibble(pos = t(pos), labels), extra_df)
   angle <- atan2(dir[2], dir[1]) / pi * 180
   geom_text(data=dat, aes(label = labels, x = pos[,1] + offset * orth_dir[1], y = pos[,2] + offset * orth_dir[2]), angle = angle, ...)
 }
@@ -89,51 +89,61 @@ find_intersection <- function(a, v, b, w){
 ```{r, paged.print=FALSE}
 offset_ctrl <-  fit$alignment_coefficients[,1,1]
 offset_trt <-  fit$alignment_coefficients[,1,2]
-scale_ctrl <- 1 + fit$alignment_coefficients[,2,1]
-scale_trt <- 1 + fit$alignment_coefficients[,2,2]
+scale_ctrl <- (1 + fit$alignment_coefficients[,2,1])
+scale_trt <- (1 + fit$alignment_coefficients[,2,2]) 
 
 
 
 arc_dat <- bind_rows(
   tibble(pos = t(find_intersection(rowMeans(Y), fit$base_point, fit$linear_coefficients[,2], trt_space)), 
-         r = 2, start = atan2(fit$base_point[1], fit$base_point[2]), end = atan2(trt_space[1], trt_space[2])),
+         r = 3, start = atan2(fit$base_point[1], fit$base_point[2]), end = atan2(trt_space[1], trt_space[2])),
   tibble(pos = t(find_intersection(rowMeans(Y), fit$base_point, fit$linear_coefficients[,1], ctrl_space)), 
-         r = 2.7, start = atan2(fit$base_point[1], fit$base_point[2]), end = atan2(ctrl_space[1], ctrl_space[2])))
+         r = 2.5, start = atan2(fit$base_point[1], fit$base_point[2]), end = atan2(ctrl_space[1], ctrl_space[2])))
 
 # Lets make some data
 pl1 <- tibble(celltype = celltype_assign, condition = cond_assign, 
        Y = t(Y), Y_ctrl = t(Y_pred_ctrl), Y_trt = t(Y_pred_trt)) %>%
   ggplot() +
-    annotate_subspace(origin = rowMeans(Y), dir = fit$base_point, color = "#898989", lwd = 0.5) +
-    annotate_labels_along(origin = rowMeans(Y), dir = fit$base_point, labels = "$o$: base space", at = 4, 
+    annotate_subspace(origin = rowMeans(Y), dir = fit$base_point, color = "#898989", lwd = 0.5, alpha = 0.3) +
+    annotate_labels_along(origin = rowMeans(Y), dir = fit$base_point, labels = "$o$: base space", at = 3,
                           offset = 0.15, size = font_size_small/.pt, color = "#898989") +
     annotate_subspace(origin = fit$linear_coefficients[,1], dir = ctrl_space, color = "black", lwd = 0.6) +
-    annotate_labels_along(origin = fit$linear_coefficients[,1], dir = ctrl_space, labels = "$R(\\textrm{control})$", at = 4, 
-                          hjust = 0, offset = -0.2, size = font_size_small/.pt, color = "#898989") +
+    annotate_labels_along(origin = fit$linear_coefficients[,1], dir = ctrl_space, labels = "$R(\\textrm{control})$", at = 2.5,
+                          hjust = 0, offset = -0.15, size = font_size_small/.pt, color = "#898989") +
     annotate_subspace(origin = fit$linear_coefficients[,2], dir = trt_space, color = "black", lwd = 0.6) +
-    annotate_labels_along(origin = fit$linear_coefficients[,2], dir = trt_space, labels = "$R(\\textrm{treated})$", at = 4, 
-                          hjust = 0, offset = 0.2, size = font_size_small/.pt, color = "#898989") +
-    annotate_ticks(fit$linear_coefficients[,1] - ctrl_space %*% offset_ctrl, dir = ctrl_space * scale_ctrl, at = -5:4) +
-    annotate_ticks(fit$linear_coefficients[,2] - trt_space %*% offset_trt, dir = trt_space * scale_trt, at = -5:5) +
-    annotate_labels_along(fit$linear_coefficients[,1] - ctrl_space %*% offset_ctrl, dir = ctrl_space * scale_ctrl, at = -5:4, labels = -5:4, offset = 0.2, size = font_size_tiny / .pt) +
-    annotate_labels_along(fit$linear_coefficients[,2] - trt_space %*% offset_trt, dir = trt_space * scale_trt, at = c(-5:-2, 0:5), labels = c(-5:-2, 0:5), offset = -0.2, size = font_size_tiny / .pt) +
+    annotate_labels_along(origin = fit$linear_coefficients[,2], dir = trt_space, labels = "$R(\\textrm{treated})$", at = 2.5,
+                          hjust = 0, offset = 0.15, size = font_size_small/.pt, color = "#898989") +
+    annotate_ticks(fit$linear_coefficients[,1] - ctrl_space * offset_ctrl / scale_ctrl, dir = ctrl_space / scale_ctrl, at = -4:3) +
+    annotate_ticks(fit$linear_coefficients[,2] - trt_space * offset_trt / scale_trt, dir = trt_space / scale_trt, at = -3:3) +
+    annotate_labels_along(fit$linear_coefficients[,1] - ctrl_space * offset_ctrl / scale_ctrl, dir = ctrl_space / scale_ctrl, at = -2:2, offset = 0.3, size = font_size_tiny / .pt) +
+    annotate_labels_along(fit$linear_coefficients[,1] - ctrl_space * offset_ctrl / scale_ctrl, dir = ctrl_space / scale_ctrl, at = -4:-3, offset = -0.3, size = font_size_tiny / .pt) +
+    annotate_labels_along(fit$linear_coefficients[,2] - trt_space * offset_trt / scale_trt, dir = trt_space / scale_trt, at = -1:3, offset = -0.3, size = font_size_tiny / .pt) +
+    annotate_labels_along(fit$linear_coefficients[,2] - trt_space * offset_trt / scale_trt, dir = trt_space / scale_trt, at = -3:-2, offset = 0.3, size = font_size_tiny / .pt) +
     ggforce::geom_arc(data = arc_dat, aes(x0=pos[,1], y0=pos[,2], r=r, start=start, end=end), linetype = "solid", arrow = arrow(type="closed", length = unit(2, "mm"))) +
-    annotate("text", x = 3, y = 3.05, label = "$\\operatorname{Exp}^{(\\textrm{Gr})}_{o}(x B)$", hjust = 0, size = font_size_small/.pt) +
-    annotate("text", x = 1.3, y = 1.3, label = "$x \\Gamma$", hjust = 0.5, size = font_size_small/.pt) +
-    annotate("segment", x = 1.3, y = 1.5, xend = fit$linear_coefficients[1,1], yend = fit$linear_coefficients[2,1], color = "lightgrey") +
-    annotate_point(fit$linear_coefficients[,1]) +
-    annotate_point(fit$linear_coefficients[,2]) +
-    geom_point(aes(x = Y[,1], y = Y[,2], color = condition), size = 0.5) +
+    annotate("text", x = 1.2, y = 1.7, label = "$\\operatorname{Exp}^{(\\textrm{Gr})}_{o}(x B)$", hjust = 0, size = font_size_small/.pt) +
+    annotate("text", x = 0.3, y = 0.4, label = "$x \\Gamma$", hjust = 0.5, size = font_size_small/.pt) +
+    annotate("segment", x = 0.3, y = 0.5, xend = fit$linear_coefficients[1,1], yend = fit$linear_coefficients[2,1], color = "lightgrey") +
+    annotate_point(fit$linear_coefficients[,1], size = 0.8) +
+    annotate_point(fit$linear_coefficients[,2], size = 0.8) +
+    # The following is a helpful check that my ticks are correct
+    # geom_point(data = tibble(Y = t(lemur:::predict.lemur_fit(fit, newcondition = cond(cond_assign = "control"), embedding = matrix(c(0:5), nrow = 1)))),
+    #            aes(x = Y[,1], y = Y[,2]), color = "red", size = 0.3) +
+    # geom_point(data = tibble(Y = t(lemur:::predict.lemur_fit(fit, newcondition = cond(cond_assign = "treated"), embedding = matrix(c(0:5), nrow = 1)))),
+    #            aes(x = Y[,1], y = Y[,2]), color = "red", size = 0.3) +
+    geom_point(aes(x = Y[,1], y = Y[,2], color = condition), size = 0.3) +
     scale_color_manual(values = c("control" = "#FC8D62", "treated" = "#8DA0CB")) +
+    scale_x_continuous(breaks = c(-3:3)) +
     labs(x = "Gene 1", y = "Gene 2", color = "") +
-    coord_fixed(xlim = c(-3, 6), ylim = c(-0.5, 6), clip = "off") +
-    theme(legend.position = c(0.6, 0.05), legend.direction = "horizontal") 
+    coord_fixed(xlim = c(-2.8, 3.6), ylim = c(0, 2.8), clip = "off") +
+    theme(legend.position = c(0.02, 0.05), legend.direction = "horizontal") 
 
 pl1
 ```
 
+
+
 ```{r, paged.print=FALSE}
-true_de <- tibble(emb = c(-3.8, 3.3, -3.8, 3.3), Gene = c("Gene 1", "Gene 1", "Gene 2", "Gene 2"),
+true_de <- tibble(emb = c(-4.2, 3.5, -5, 3.8), Gene = c("Gene 1", "Gene 1", "Gene 2", "Gene 2"),
                   de = c(treat_eff[1,1], treat_eff[1,1] + treat_eff[1,2], treat_eff[2,1], treat_eff[2,1] + treat_eff[2,2]))
 
 pl2 <- tibble(celltype = celltype_assign, condition = cond_assign,emb = fit$embedding[1,]) %>%
@@ -142,14 +152,15 @@ pl2 <- tibble(celltype = celltype_assign, condition = cond_assign,emb = fit$embe
   pivot_longer(starts_with("diff"), names_sep = "-", names_to = c(".value", "Gene")) %>%
   ggplot(aes(x = emb, y = diff)) +
     geom_segment(aes(xend = emb, yend = 0, color = condition), lwd = 0.1, show.legend = FALSE) +
-    geom_segment(data = true_de, aes(x = emb - 0.4, xend = emb + 0.4, y = de, yend = de), lwd = 0.8, color = "black", linetype = "solid") +
+    # geom_segment(data = true_de, aes(x = emb - 0.4, xend = emb + 0.4, y = de, yend = de), lwd = 0.8, color = "black", linetype = "solid") +
     annotate_subspace() +
     annotate_ticks(length = 0.3) +
-    annotate_labels_along(at = -5:5, labels = -5:5, offset = 0.4, size = font_size_tiny / .pt) +
+    annotate_labels_along(at = -5:5, labels = -5:5, offset = -0.4, size = font_size_tiny / .pt, extra_df = tibble(Gene = "Gene 1")) +
+    annotate_labels_along(at = -5:5, labels = -5:5, offset =  0.4, size = font_size_tiny / .pt, extra_df = tibble(Gene = "Gene 2")) +
     scale_color_manual(values = c("control" = "#FC8D62", "treated" = "#8DA0CB")) +
     scale_x_continuous(expand = expansion(add = 0)) +
     facet_wrap(vars(Gene), nrow = 1, scales = "free_y") +
-    lims(x = c(-4.5, 4.2), y = c(-2,4)) +
+    lims(x = c(-2.7, 2.8), y = c(-1.5,2.2)) +
     labs(x = "Embedding Position ($Z$)", y = "$\\Delta$ (Treated - Control)") +
     theme(axis.ticks.x = element_blank(), axis.text.x = element_blank(), axis.line.x = element_blank(),
           panel.spacing.x = unit(3, "mm"))
@@ -161,11 +172,11 @@ pl2
 ```{r}
 plot_assemble(
   add_text("(A)", x = 0.5, y = 0.5, vjust = 1, fontsize = font_size, fontface = "bold"),
-  add_graphic("../illustrations/cell_type_kidneys.pdf", x = 10, y = 5, width = 53, height = 32, units = "mm"),
-  add_plot(pl1, x = 2, y = 0, width = 65, height = 50),
-  add_text("(B)", x = 1.5, y = 48, vjust = 1, fontsize = font_size, fontface = "bold"),
-  add_plot(pl2, x = 1, y = 50, width = 68, height = 25),
-  width = 70, height = 75, units = "mm", show_grid_lines = FALSE,
+  # add_graphic("../illustrations/cell_type_kidneys.pdf", x = 10, y = 5, width = 53, height = 32, units = "mm"),
+  add_plot(pl1, x = 2, y = 0, width = 75, height = 40),
+  add_text("(B)", x = 1.5, y = 38, vjust = 1, fontsize = font_size, fontface = "bold"),
+  add_plot(pl2, x = 1, y = 40, width = 78, height = 28),
+  width = 80, height = 68, units = "mm", show_grid_lines = FALSE,
   latex_support = TRUE, filename = "../plots/simulated_data.pdf"
 )
 ```
