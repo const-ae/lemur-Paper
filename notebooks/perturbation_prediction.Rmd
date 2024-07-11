@@ -1,0 +1,672 @@
+---
+title: "R Notebook"
+---
+
+
+```{r}
+library(tidyverse)
+library(glue)
+source("util.R")
+```
+
+```{r}
+pert_res <- bind_rows(readRDS("../benchmark/output/perturbation_results_predictions.RDS"))
+parameters <- readRDS("../benchmark/output/perturbation_results_parameters.RDS") %>%
+  map(\(p) tibble(id = p$id, name = p$name, parameters = as_tibble(p$parameters), 
+                  train = names(p$test_train_labels), perturbation = p$test_train_labels)) %>%
+  bind_rows() %>%
+  unnest(perturbation) %>%
+  unpack(parameters)
+```
+
+```{r, paged.print=FALSE}
+res <- pert_res %>%
+  mutate(perturbation_split = str_split(perturbation, pattern = "[+_]", n = 2)) %>%
+  mutate(perturbation_split = map(perturbation_split, \(x) {
+    if(all(x == "ctrl" | x == "")) "ctrl" 
+    else if(length(x) == 2) x
+    else c(x, "ctrl")
+  })) %>%
+  mutate(perturbation = map_chr(perturbation_split, paste0, collapse = "+")) %>%
+  tidylog::left_join(parameters, by = c("id", "name", "perturbation")) %>%  # Matches most of x. Non matches are from scGPT and are not in training
+  tidylog::filter(! is.na(train)) %>%
+  separate(name, sep = "-", into = c("dataset_name2", "seed2", "method"), convert = TRUE) %>%
+  tidylog::filter(dataset_name2 == dataset_name | seed2 == seed) %>%
+  dplyr::select(-c(dataset_name2, seed2))
+```
+
+
+```{r, paged.print=FALSE}
+long2matrix <- function(x, rows, cols, values, ...){
+  df_mat <- x |>
+    transmute({{rows}}, {{cols}}, {{values}}) |>
+    pivot_wider(id_cols = {{rows}}, names_from = {{cols}}, values_from = {{values}}, ...) 
+  mat<- as.matrix(df_mat[,-1])
+  rownames(mat) <- df_mat[[1]]
+  mat
+}
+
+heatmaps <- res %>%
+  filter(seed == 1) %>%
+  mutate(present = map_lgl(prediction, \(x) ! is.na(x[1]))) %>%
+  group_by(dataset_name) %>%
+  group_map(\(data, key){
+    mat <- long2matrix(data, rows = method, cols = perturbation, values = present, values_fn = \(x) x * 1.0) 
+    mat[is.na(mat)] <- 0
+    ComplexHeatmap::pheatmap(mat, main = paste0(key[[1]][1]), breaks = c(0,1), color = c("lightgrey", "darkred"))
+  })
+
+heatmaps
+```
+
+
+```{r, paged.print=FALSE}
+valid_perts <- res %>%
+  filter(map_lgl(prediction, \(x) !is.na(x[1]))) %>%
+  dplyr::select(dataset_name, seed, method, perturbation) %>%
+  summarize(n = n(), .by = c(dataset_name,seed, perturbation)) %>%
+  filter(n == max(n), .by = c(dataset_name, seed)) %>%
+  dplyr::select(-n)
+``` 
+
+```{r, paged.print=FALSE}
+baselines <- res %>%
+  filter(method == "ground_truth" & perturbation == "ctrl") %>%
+  dplyr::select(baseline = prediction, dataset_name, seed)
+```
+
+
+```{r, paged.print=FALSE}
+r2_fnc <- function(x, y) cor(x, y)
+r2_delta_fnc <- function(x, y) cor(x - baseline, y - baseline)
+l2_fnc <- function(x, y) sqrt(sum((x - y)^2))
+
+contr_res <- tidylog::full_join(filter(res, method != "ground_truth"),
+                                filter(res, method == "ground_truth") %>% dplyr::select(dataset_name, seed, perturbation, observed = prediction),
+           by = c("dataset_name", "seed", "perturbation"))
+
+res_metrics <- contr_res %>%
+  tidylog::inner_join(valid_perts, by = c("perturbation", "dataset_name", "seed")) %>%
+  tidylog::left_join(baselines, by = c("dataset_name", "seed")) %>%
+  dplyr::select(-c(id, test_train_config_id, epochs)) %>%
+  mutate(r2 = map2_dbl(prediction, observed, \(x, y) cor(x, y)),
+         r2_delta = pmap_dbl(list(prediction, observed, baseline), \(x, y, b) cor(x-b, y-b)),
+         l2 = map2_dbl(prediction, observed, \(x, y) sqrt(sum((x - y)^2))))
+```
+
+
+```{r, paged.print=FALSE}
+res_metrics %>%
+  mutate(train = ifelse(train == "train", "train", "test")) %>%
+  filter(dataset_name != "norman") %>%
+  filter(is.na(reference_data) | reference_data != dataset_name) %>%
+  ggplot(aes(x = method, y = r2_delta)) +
+    ggbeeswarm::geom_quasirandom() +
+    stat_summary(geom = "crossbar", fun = mean, color = "red") +
+    facet_grid(vars(dataset_name), vars(train)) +
+    guides(x = guide_axis(angle = 90))
+```
+
+```{r, paged.print=FALSE}
+res_metrics %>%
+  mutate(train = ifelse(train == "train", "train", "test")) %>%
+  filter(dataset_name != "norman") %>%
+  filter(is.na(reference_data) | reference_data != dataset_name) %>%
+  ggplot(aes(x = method, y = l2)) +
+    ggbeeswarm::geom_quasirandom() +
+    stat_summary(geom = "crossbar", fun = mean, color = "red") +
+    facet_grid(vars(dataset_name), vars(train), scales = "free_y") +
+    scale_y_log10() +
+    guides(x = guide_axis(angle = 90)) +
+    theme(axis.title.x = element_blank(),
+        panel.grid.major.y = element_line(color = "lightgrey", linewidth = 0.1),
+        panel.grid.minor.y = element_line(color = "lightgrey", linewidth = 0.1))
+```
+
+
+
+
+# Headline plot
+
+
+```{r, paged.print=FALSE}
+method_labels <- c("gears" = "GEARS", "scgpt" = "scGPT", "linear" = "Linear", "pretrained" = "Linear\npretrained",
+                   "additive_model" = "Additive", "pylemur" = "LEMUR")
+dataset_labels <- c("norman" = "Norman", "adamson" = "Adamson", "replogle_k562_essential" = "K562 Replogle",
+                    "replogle_rpe1_essential" = "RPE1 Replogle")
+
+main_pl_data <- res_metrics %>%
+  mutate(train = ifelse(train == "train", "train", "test")) %>%
+  filter(! method %in% c("scgpt_oneshot", "linear_highRidge") & !str_detect(method, "highDim")) %>%
+  filter(is.na(reference_data) | reference_data != dataset_name) %>%
+  filter(train == "test") %>%
+  filter(! (dataset_name == "adamson" & method == "pretrained_rpe1")) %>%
+  mutate(method = ifelse(str_detect(method, "pretrained"), "pretrained", method)) %>%
+  mutate(method = factor(method, levels = names(method_labels))) %>%
+  mutate(dataset_name = factor(dataset_name, levels = names(dataset_labels))) 
+
+main_pl_single <- main_pl_data %>%
+  filter(dataset_name != "norman") %>%
+  ggplot(aes(x = method, y = r2_delta)) +
+    geom_hline(yintercept = 0, color = "black", linewidth = 0.2) +
+    ggbeeswarm::geom_quasirandom(size = 0.1, color =  "#444444", alpha = 0.6) +
+    stat_summary(geom = "crossbar", fun = mean, color = "red") +
+    geom_point(data = . %>% filter(perturbation == "AHR+FEV"), color = "#28A2C7", size = 0.7) +
+    facet_wrap(vars(dataset_name), scales = "free_x", labeller = as_labeller(dataset_labels), nrow = 1) +
+    scale_x_discrete(labels = method_labels) +
+    scale_y_continuous(limits = c(-0.25, 1), expand = expansion(add = 0)) +
+    guides(x = guide_axis(angle = 90)) +
+    labs(y = "Pearson delta", subtitle = "Single perturbation") +
+    theme(axis.title.x = element_blank(),
+          panel.grid.major.y = element_line(color = "lightgrey", linewidth = 0.1),
+          panel.grid.minor.y = element_line(color = "lightgrey", linewidth = 0.1),
+          panel.spacing.x = unit(3, "mm"))
+
+main_pl_double <- main_pl_data %>%
+  filter(dataset_name == "norman") %>%
+  ggplot(aes(x = method, y = r2_delta)) +
+    geom_hline(yintercept = 0, color = "black", linewidth = 0.2) +
+    ggbeeswarm::geom_quasirandom(size = 0.1, color =  "#444444", alpha = 0.6) +
+    stat_summary(geom = "crossbar", fun = mean, color = "red") +
+    facet_wrap(vars(dataset_name), scales = "free_x", labeller = as_labeller(dataset_labels), nrow = 1) +
+    scale_x_discrete(labels = method_labels) +
+    scale_y_continuous(limits = c(-0.25, 1), expand = expansion(add = 0)) +
+    guides(x = guide_axis(angle = 90)) +
+    labs(y = "Pearson delta", subtitle = "Double perturbation") +
+    theme(axis.title.x = element_blank(),
+          panel.grid.major.y = element_line(color = "lightgrey", linewidth = 0.1),
+          panel.grid.minor.y = element_line(color = "lightgrey", linewidth = 0.1),
+          panel.spacing.x = unit(3, "mm"))
+
+main_pl_single
+main_pl_double
+```
+
+
+```{r, paged.print=FALSE}
+# pert_error_many_plots <- res %>%
+#   mutate(train = ifelse(train == "train", "train", "test")) %>%
+#   filter(dataset_name == "norman")  %>%
+#   filter(seed == 1) %>%
+#   filter(lengths(map(perturbation_split, \(x) setdiff(x, "ctrl"))) == 2) %>%
+#   nest(data = -perturbation) %>%
+#   slice_sample(n = 24) %>%
+#   unnest(data) %>%
+#   filter(method %in% c("scgpt", "gears", "additive_model", "ground_truth")) %>%
+#   dplyr::select(perturbation, method, prediction) %>%
+#   unnest(prediction) %>%
+#   mutate(id = seq_len(n()), .by = method) %>%
+#   pivot_wider(id_cols = c(perturbation, id), names_from = method, values_from = prediction) %>%
+#   pivot_longer(c(scgpt, gears), names_to = "method") %>%
+#   filter(! is.na(value)) %>%
+#   mutate(error_meth = case_when(
+#     value-ground_truth > 0.8 ~ Inf,
+#     value-ground_truth < -0.8 ~ -Inf,
+#     .default = value-ground_truth
+#   )) %>%
+#   mutate(error_add = case_when(
+#     additive_model-ground_truth > 0.8 ~ Inf,
+#     additive_model-ground_truth < -0.8 ~ -Inf,
+#     .default = additive_model-ground_truth
+#   )) %>%
+#   ggplot(aes(x = error_add, y = error_meth)) +
+#     annotate(geom = "rect", xmin = -Inf, xmax = -0.2, ymin = -0.2, ymax = 0.2, fill = "#86DD7B", alpha = 0.7) +
+#     annotate(geom = "rect", xmin = 0.2, xmax = Inf, ymin = -0.2, ymax = 0.2, fill = "#86DD7B", alpha = 0.7) +
+#     annotate(geom = "rect", xmin = -Inf, xmax = -0.2, ymin = -Inf, ymax = Inf, fill = "#86DD7B", alpha = 0.2) +
+#     annotate(geom = "rect", xmin = 0.2, xmax = Inf, ymin = -Inf, ymax = Inf, fill = "#86DD7B", alpha = 0.2) +
+#     geom_ribbon(data = tibble(x = c(-2, 0, 2), ymin = x-0.2, ymax = x+0.2),
+#               aes(x = x, ymin = ymin, ymax = ymax, y = x), fill = "#F4C260", alpha = 1) +
+#     annotate(geom = "rect", xmin = -0.2, xmax = 0.2, ymin = -Inf, ymax = Inf, fill = "lightblue", alpha = 0.2) +
+#     ggrastr::rasterize(geom_point(size = 0.1, stroke = 0), dpi = 300) +
+#     scale_x_continuous(expand = expansion(add = 0), breaks = c(-1, 0, 1)) +
+#     scale_y_continuous(expand = expansion(add = 0), breaks = c(-1, 0, 1)) +
+#     coord_fixed(clip = "on", xlim = c(-1, 1), ylim = c(-1, 1)) +
+#     ggh4x::facet_nested_wrap(vars(perturbation, method), ncol = 8, labeller = labeller(method = as_labeller(method_labels)))  +
+#     labs(x = "Non-additive perturbation effect\n(additive minus observed)",
+#          y = "GEARS / scGPT prediction error\n(prediction minus observed)") +
+#     theme(panel.spacing.x = unit(3, "mm"), 
+#           strip.text = element_text(margin = margin(b = 0, unit = "mm")))
+# 
+# pert_error_many_plots
+# 
+# plot_assemble(
+#   add_plot(pert_error_many_plots, x = 0, y = 0, width = 170, height = 150),
+#   width = 170, height = 150, units = "mm", show_grid_lines = FALSE,
+#   latex_support = TRUE, filename = "../plots/suppl_perturbation_error.pdf"
+# )
+```
+
+
+```{r, paged.print=FALSE}
+# error_comparison_pl <- res %>%
+#   mutate(train = ifelse(train == "train", "train", "test")) %>%
+#   filter(dataset_name == "norman")  %>%
+#   filter(perturbation == "AHR+FEV") %>%
+#   filter(seed == 1) %>%
+#   filter(method %in% c("scgpt", "gears", "additive_model", "ground_truth")) %>%
+#   dplyr::select(method, prediction) %>%
+#   unnest(prediction) %>%
+#   mutate(id = seq_len(n()), .by = method) %>%
+#   pivot_wider(id_cols = id, names_from = method, values_from = prediction) %>%
+#   pivot_longer(c(scgpt, gears), names_to = "method") %>%
+#   filter(! is.na(value)) %>%
+#   mutate(error_meth = case_when(
+#     value-ground_truth > 1 ~ Inf,
+#     value-ground_truth < -1 ~ -Inf,
+#     .default = value-ground_truth
+#   )) %>%
+#   mutate(error_add = case_when(
+#     additive_model-ground_truth > 1 ~ Inf,
+#     additive_model-ground_truth < -1 ~ -Inf,
+#     .default = additive_model-ground_truth
+#   )) %>%
+#   ggplot(aes(x = error_add, y = error_meth)) +
+#     annotate(geom = "rect", xmin = -Inf, xmax = -0.2, ymin = -0.2, ymax = 0.2, fill = "#86DD7B", alpha = 0.7) +
+#     annotate(geom = "rect", xmin = 0.2, xmax = Inf, ymin = -0.2, ymax = 0.2, fill = "#86DD7B", alpha = 0.7) +
+#     annotate(geom = "rect", xmin = -Inf, xmax = -0.2, ymin = -Inf, ymax = Inf, fill = "#86DD7B", alpha = 0.2) +
+#     annotate(geom = "rect", xmin = 0.2, xmax = Inf, ymin = -Inf, ymax = Inf, fill = "#86DD7B", alpha = 0.2) +
+#     geom_ribbon(data = tibble(x = c(-2, 0, 2), ymin = x-0.2, ymax = x+0.2),
+#               aes(x = x, ymin = ymin, ymax = ymax, y = x), fill = "#F4C260", alpha = 1) +
+#     annotate(geom = "rect", xmin = -0.2, xmax = 0.2, ymin = -Inf, ymax = Inf, fill = "lightblue", alpha = 0.2) +
+#     annotate(geom = "text", label = "Additive", x = 0, hjust = 0.5, y = -0.95, vjust = 0, size = font_size_tiny / .pt) +
+#     annotate(geom = "text", label = "Suppresion", x = 0.98, hjust = 1, y = 0, vjust = 0.5, size = font_size_tiny / .pt) +
+#     annotate(geom = "text", label = "Synergy", x = -0.98, hjust = 0, y = 0, vjust = 0.5, size = font_size_tiny / .pt) +
+#     annotate(geom = "text", label = "... as additive", x = 0.95, y = 0.95, hjust = 1, vjust = 0.5,  angle = 45, size = font_size_tiny / .pt) +
+#     annotate(geom = "text", label = "Same error...", x = -0.95, y = -0.95, hjust = 0, vjust = 0.5,  angle = 45, size = font_size_tiny / .pt) +
+#     ggrastr::rasterize(geom_point(size = 0.3, stroke = 0), dpi = 600) +
+#     scale_x_continuous(expand = expansion(add = 0)) +
+#     scale_y_continuous(expand = expansion(add = 0)) +
+#     coord_fixed(clip = "on", xlim = c(-1, 1), ylim = c(-1, 1)) +
+#     facet_wrap(vars(method), labeller = labeller(method = as_labeller(method_labels)))  +
+#     labs(x = "Non-additive perturbation effect\n(additive minus observed)", y = "GEARS / scGPT prediction error\n(prediction minus observed)") +
+#     theme(panel.spacing.x = unit(5, "mm"))
+# 
+# error_comparison_pl
+```
+
+```{r, paged.print=FALSE}
+threshold <- 0.15
+
+inter_pred_dat <- res %>%
+  mutate(train = ifelse(train == "train", "train", "test")) %>%
+  filter(dataset_name == "norman")  %>%
+  filter(seed == 1) %>%
+  filter(train == "test") %>%
+  # filter(perturbation == "AHR+FEV") %>%
+  filter(lengths(map(perturbation_split, \(x) setdiff(x, "ctrl"))) == 2) %>%
+  tidylog::left_join(baselines, by = c("dataset_name", "seed")) %>%
+  filter(method %in% c("scgpt", "gears", "additive_model", "ground_truth")) %>%
+  dplyr::select(perturbation, method, prediction, baseline) %>%
+  unnest(c(prediction, baseline)) %>%
+  mutate(id = seq_len(n()), .by = method) %>%
+  pivot_wider(id_cols = c(perturbation, id, baseline), names_from = method, values_from = prediction) %>%
+  pivot_longer(c(scgpt, gears), names_to = "method") %>%
+  filter(! is.na(value)) %>%
+  mutate(interaction_type = case_when(
+    abs(ground_truth - additive_model) <= threshold ~ "additive",
+    ground_truth - additive_model > threshold ~ "synergistic",
+    ground_truth - additive_model < -threshold ~ "suppressive"
+  )) %>%
+  mutate(prediction_type = case_when(
+    abs(value - additive_model) <= threshold ~ "additive",
+    value - additive_model > threshold ~ "synergistic",
+    value - additive_model < -threshold ~ "suppressive"
+  )) %>%
+  mutate(prediction_label = paste0("Interaction=", interaction_type, " prediction=", prediction_type)) %>%
+  mutate(relevant_change = abs(ground_truth - baseline) > 0.1)
+```
+
+
+```{r, paged.print=FALSE}
+better_counts <- inter_pred_dat %>%
+  mutate(pred_better = case_when(
+    abs(abs(value - ground_truth) - abs(ground_truth - additive_model)) < threshold ~ "equal",
+    abs(value - ground_truth) - abs(ground_truth - additive_model) > threshold ~ "add better",
+    abs(value - ground_truth) - abs(ground_truth - additive_model) < -threshold ~ "pred better",
+  )) %>%
+  dplyr::count(method, pred_better) %>%
+  mutate(n = scales::label_comma()(n)) %>%
+  mutate(y = case_when(
+    pred_better == "add better" ~ 0.75,
+    pred_better == "equal" ~ 0,
+    pred_better == "pred better" ~ -0.75
+  )) %>%
+  mutate(label = case_when(
+    pred_better == "add better" ~ paste0("False non-additive\nprediction (n=",n,")"),
+    pred_better == "equal" ~ paste0("Additive prediction\n(n=",n,")"),
+    pred_better == "pred better" ~ paste0("True non-additive\nprediction (n=",n,")")
+  ))
+
+pert_pred_comparison <- inter_pred_dat %>%
+  mutate(interaction_type = factor(interaction_type, levels = c("suppressive", "additive", "synergistic"))) %>%
+  ggplot(aes(x = (ground_truth - additive_model), y = abs(value - ground_truth) - abs(additive_model - ground_truth))) +
+    ggrastr::rasterize(geom_point(aes(color = interaction_type), size = 0.1, stroke = 0), dpi = 600) +
+    geom_hline(yintercept = c(threshold, -threshold), linewidth = 0.3) +
+    geom_text(data = better_counts, aes(x = -1.37, y = y, label = label), hjust = 0, vjust = 0.5, size = font_size_tiny / .pt, lineheight = font_size_tiny / .pt / 2) +
+    facet_wrap(vars(method), labeller = as_labeller(method_labels)) +
+    scale_x_continuous(expand = expansion(add = 0)) +
+    coord_fixed(xlim = c(-1.4, 1), ylim = c(-1, 1)) +
+    guides(color = guide_legend(override.aes = list(size = 2))) +
+    labs(x = "Interaction type ($\\textrm{additive error} = \\textrm{observed} - \\textrm{additive}$)", y = "$|\\textrm{prediction error}| - |\\textrm{additive error}|$",
+         color = "") +
+    theme(legend.position = "bottom")
+pert_pred_comparison
+```
+
+```{r, paged.print=FALSE}
+# double_cross_pl <- inter_pred_dat %>%
+#   mutate(pred_better = case_when(
+#     abs(abs(value - ground_truth) - abs(ground_truth - additive_model)) < threshold ~ "~ equal",
+#     abs(value - ground_truth) - abs(ground_truth - additive_model) > threshold ~ "add better",
+#     abs(value - ground_truth) - abs(ground_truth - additive_model) < -threshold ~ "pred better",
+#   )) %>%
+#   ggplot(aes(x = ground_truth - additive_model, y = value - additive_model)) +
+#     annotate(geom = "text", x = -0.98, y = 0.7, label = "add. better", hjust = 0, vjust = 1, size = font_size_tiny / .pt) +
+#     annotate(geom = "text", x = 0.98, y = 0.7, label = "pred.\nbetter", hjust = 1, vjust = 1, size = font_size_tiny / .pt) +
+#     annotate(geom = "text", x = 0.98, y = -0.7, label = "add. better", hjust = 1, vjust = 0, size = font_size_tiny / .pt) +
+#     annotate(geom = "text", x = -0.98, y = -0.7, label = "pred.\nbetter", hjust = 0, vjust = 0, size = font_size_tiny / .pt) +
+#     ggrastr::rasterize(geom_point(aes(color = interaction_type), size = 0.2, stroke = 0), dpi = 600) +
+#     annotate(geom = "path", x = c(-Inf, 0, 1-threshold*4), y = c(threshold, threshold, 1)) +
+#     annotate(geom = "path", x = -c(-Inf, 0, 1-threshold*4), y = -c(threshold, threshold, 1)) +
+#     annotate(geom = "path", x = c(Inf, threshold, 1-threshold*3), y = c(threshold, threshold, 1)) +
+#     annotate(geom = "path", x = -c(Inf, threshold, 1-threshold*3), y = -c(threshold, threshold, 1)) +
+#     facet_wrap(vars(method)) +
+#     coord_fixed(xlim = c(-1, 1), ylim = c(-1, 1)) +
+#     guides(color = guide_legend(override.aes = list(size = 2))) +
+#     labs(x = "Interaction type (observed minus additive)", y = "Predicted interaction type\n(prediction minus additive)",
+#          color = "")
+# 
+# double_cross_pl
+```
+
+
+```{r, paged.print=FALSE}
+inter_pred_dat %>%
+  mutate(pred_better = case_when(
+    abs(abs(value - ground_truth) - abs(ground_truth - additive_model)) < threshold ~ "~ equal",
+    abs(value - ground_truth) - abs(ground_truth - additive_model) > threshold ~ "add better",
+    abs(value - ground_truth) - abs(ground_truth - additive_model) < -threshold ~ "pred better",
+  )) %>%
+  filter(pred_better != "~ equal") %>%
+  dplyr::count(pred_better, prediction_label, interaction_type, prediction_type, method) %>%
+  mutate(interaction_type = factor(interaction_type, levels = c("suppressive", "additive", "synergistic")),
+         prediction_type = factor(prediction_type, levels = c("suppressive", "additive", "synergistic"))) %>%
+  mutate(n = scales::label_comma()(n)) %>%
+  ggplot(aes(x = interaction_type, y = prediction_type)) +
+    geom_tile(aes(fill = prediction_label), show.legend = FALSE) +
+    geom_text(aes(label = n), size = font_size / .pt) +
+    scale_y_discrete(drop = FALSE) +
+    facet_wrap(vars(method, pred_better), drop = FALSE)
+```
+
+
+Make alignment plot
+
+```{r}
+objects <- readRDS("../benchmark/output/perturbation_psce_objects.RDS")
+psce <- objects$psce
+baseline <- objects$baseline
+ref_psce <- objects$ref_psce
+ref_baseline <- objects$ref_baseline
+ridge_penalty <- objects$ridge_penalty
+pca_dim <- objects$pca_dim
+
+# Compare perturbation and gene names
+ref_conds <- unique(ref_psce$clean_condition)
+conds <- unique(psce$clean_condition)
+# conds <- setdiff(conds, "ctrl")
+print("Number of perturbations that are reference: ")
+print(table(conds %in% ref_conds))
+
+psce$in_ref <- psce$clean_condition %in% ref_conds
+
+# Subtract baseline
+assay(psce, "centered_mat", withDimnames = FALSE) <- as.matrix(assay(psce, "X")) - baseline
+assay(ref_psce, "centered_mat", withDimnames = FALSE) <- as.matrix(assay(ref_psce, "X")) - ref_baseline
+
+# Work on training data!
+train_data <- psce[,psce$training == "train"]
+
+# Relate the embeddings with ridge regression
+train_idx_matches <- match(train_data$clean_condition,ref_psce$clean_condition)
+train_pert_match <- seq_len(ncol(train_data))[! is.na(train_idx_matches)]
+train_ref_match <- na.omit(train_idx_matches)
+
+idx_matches <- match(psce$clean_condition,ref_psce$clean_condition)
+pert_match <- seq_len(ncol(psce))[! is.na(idx_matches)]
+ref_match <- na.omit(idx_matches)
+
+# Build embeddings
+set.seed(1)
+pert_pca <- lemur:::pca(assay(train_data, "centered_mat"), n = pca_dim)
+set.seed(1)
+ref_pca <- lemur:::pca(assay(ref_psce, "centered_mat"), n = pca_dim)
+
+X_train <- cbind(1, t(ref_pca$embedding[,train_ref_match,drop=FALSE]))
+beta <- lemur:::ridge_regression(pert_pca$embedding[,train_pert_match,drop=FALSE], X_train,
+                                 ridge_penalty = c(0, rep(ridge_penalty, times = min(ncol(X_train)-1, pca_dim))))
+
+pred <- matrix(NA, nrow = nrow(psce), ncol = ncol(psce))
+pred[,pert_match] <- pert_pca$coordsystem %*% beta %*% rbind(1, ref_pca$embedding[,ref_match,drop=FALSE]) + pert_pca$offset + baseline
+rownames(pred) <- rownames(psce)
+```
+
+Overfitted linear model
+```{r, paged.print=FALSE}
+set.seed(1)
+system.time(
+  pert_pca2 <- lemur:::pca(assay(train_data, "centered_mat"), n = 300)
+)
+set.seed(1)
+ref_pca2 <- lemur:::pca(assay(ref_psce, "centered_mat"), n = 300)
+
+X_train2 <- cbind(1, t(ref_pca2$embedding[,train_ref_match,drop=FALSE]))
+beta2 <- lemur:::ridge_regression(pert_pca2$embedding[,train_pert_match,drop=FALSE], X_train2,
+                                 ridge_penalty = rep(0, ncol(X_train2)))
+
+pred2 <- matrix(NA, nrow = nrow(psce), ncol = ncol(psce))
+pred2[,pert_match] <- pert_pca2$coordsystem %*% beta2 %*% rbind(1, ref_pca2$embedding[,ref_match,drop=FALSE]) + pert_pca2$offset + baseline
+
+overfit_pred <- as_tibble(colData(psce)) %>%
+  mutate(emb_large = t(t(pert_pca2$coordsystem) %*% (assay(psce, "centered_mat") - pert_pca2$offset))) %>%
+  mutate(emb_small = t(t(pert_pca$coordsystem) %*% (assay(psce, "centered_mat") - pert_pca$offset))) %>%
+  mutate(prediction_large = map(seq_len(ncol(psce)), \(idx) pred2[,idx])) %>%
+  mutate(prediction_small = map(seq_len(ncol(psce)), \(idx) pred[,idx])) %>%
+  tidylog::left_join(
+    as_tibble(colData(ref_psce)) %>%
+      mutate(alignedEmb_large = t(t(ref_pca2$coordsystem) %*% (assay(ref_psce, "centered_mat") - ref_pca2$offset))) %>%
+      mutate(alignedEmb_large = t(beta2 %*% t(cbind(1, alignedEmb_large)))) %>%
+      mutate(alignedEmb_small = t(t(ref_pca$coordsystem) %*% (assay(ref_psce, "centered_mat") - ref_pca$offset))) %>%
+      mutate(alignedEmb_small = t(beta %*% t(cbind(1, alignedEmb_small)))),
+    by = c("condition", "clean_condition")
+  ) %>%
+  tidylog::left_join(
+    res %>% filter(method == "ground_truth" & seed == 1 & dataset_name == "replogle_rpe1_essential") %>% dplyr::select(condition = perturbation, observed = prediction),
+    by = c("condition")
+  ) %>%
+  mutate(baseline = baselines %>% filter(dataset_name == "replogle_rpe1_essential" & seed == 1) %>% pull(baseline)) %>%
+  mutate(dist_large = sqrt(rowSums2((emb_large - alignedEmb_large)^2)),
+         dist_small = sqrt(rowSums2((emb_small - alignedEmb_small)^2))) %>%
+  dplyr::select(-c(starts_with(c("emb_", "alignedEmb_")))) %>%
+  pivot_longer(starts_with(c("prediction_", "dist_")), names_sep = "_", names_to = c(".value", "method")) %>%
+  mutate(r2 = map2_dbl(prediction, observed, \(x, y) cor(x, y)),
+         r2_delta = pmap_dbl(list(prediction, observed, baseline), \(x, y, b) cor(x-b, y-b)),
+         l2 = map2_dbl(prediction, observed, \(x, y) sqrt(sum((x - y)^2))))
+```
+
+
+```{r, paged.print=FALSE}
+pretraining_overfitting_example <- overfit_pred %>%
+  mutate(training = ifelse(training == "train", "train", "test")) %>%
+  mutate(method = factor(method, levels = c("small", "large"))) %>%
+  ggplot(aes(x = dist, y = r2_delta)) +
+    ggrastr::rasterize(geom_point(aes(color = training), size = 0.5, stroke = 0), dpi = 600) +
+    stat_summary(geom = "hline", fun = mean, aes(x = 1, yintercept = after_stat(y), color = training), orientation = "x", show.legend = FALSE) +
+    stat_summary(geom = "vline", fun = mean, aes(y = 1, xintercept = after_stat(x), color = training), orientation = "y", show.legend = FALSE) +
+    scale_x_log10() +
+    facet_wrap(vars(method), labeller = as_labeller(c("large" = "PCA = 300, Ridge Penalty = 0", "small" = "PCA = 5, Ridge Penalty = 0.1"))) +
+    guides(color = guide_legend(override.aes = list(size = 2))) +
+    labs(color = "", x = "Distance between aligned and observed perturbations",
+         y = "Pearson delta") +
+    theme(panel.spacing.x = unit(3, "mm"))
+pretraining_overfitting_example
+```
+
+
+
+```{r, paged.print=FALSE}
+origin_colors <- c("k562" = "#A29048", "rpe1" = "#A782C3")
+
+rpe1_initial_pl <- as_tibble(colData(psce)) %>%
+  mutate(emb = t(t(pert_pca$coordsystem) %*% (assay(psce, "centered_mat") - pert_pca$offset))) %>%
+  mutate(training = ifelse(training == "train", "train", "test")) %>%
+  filter(in_ref) %>%
+  ggplot(aes(x = emb[,1], y = emb[,2])) +
+    ggrastr::rasterize(geom_point(data = . %>% filter(in_ref), color = origin_colors["rpe1"], size = 0.6, stroke = 0), dpi = 600) +
+    small_axis(label = "PCA", xlim = c(-9, 11), ylim = c(-6, 11), fontsize = font_size_tiny) +
+    labs(subtitle = "RPE1 perturbations") +
+    theme(plot.subtitle = element_text(hjust = 0.5))
+
+k562_rpe1_data <- as_tibble(colData(ref_psce)) %>%
+  tidylog::left_join(as_tibble(colData(psce)), by = c("condition", "clean_condition")) %>%
+  mutate(emb = t(t(ref_pca$coordsystem) %*% (assay(ref_psce, "centered_mat") - ref_pca$offset))) %>%
+  mutate(emb = t(beta %*% t(cbind(1, emb)))) %>%
+  filter(! is.na(in_ref)) %>%
+  mutate(origin = "k562") %>%
+  bind_rows(
+    as_tibble(colData(psce)) %>% 
+      mutate(emb = t(t(pert_pca$coordsystem) %*% (assay(psce, "centered_mat") - pert_pca$offset))) %>%
+      mutate(origin = "rpe1")
+  ) %>%
+  mutate(training = ifelse(training == "train", "train", "test")) %>%
+  mutate(training = factor(training, levels = c("train", "test"))) 
+
+merged_pl <- k562_rpe1_data %>%
+  filter(in_ref) %>%
+  mutate(origin = case_when(
+    origin == "rpe1" ~ "rpe1",
+    origin == "k562" & training == "train" ~ "k562_train",
+    origin == "k562" & training == "test" ~ "k562_test"
+  )) %>%
+  mutate(origin = factor(origin, levels = c("rpe1", "k562_train", "k562_test"))) %>%
+  ggplot(aes(x = emb[,1], y = emb[,2])) +
+    ggrastr::rasterize(geom_point(data = . %>% filter(origin == "rpe1"), aes(color = origin), size = 0.6, stroke = 0, alpha = 0.3), dpi = 600) +
+    ggrastr::rasterize(geom_point(data = . %>% filter(str_starts(origin, "k562")), aes(color = origin), size = 0.6, stroke = 0), dpi = 600) +
+    scale_color_manual(values = c("rpe1" = unname(origin_colors["rpe1"]), 
+                                  "k562_train" = colorspace::lighten(unname(origin_colors["k562"]), amount = 0.1),
+                                  "k562_test" = colorspace::darken(unname(origin_colors["k562"]), amount = 0.1)),
+                       labels = c("rpe1" = "RPE1 perturbations", "k562_train" = "K562 perturbations\nin training set", "k562_test" = "K562 perturbations\nin test set"),
+                       breaks = c("rpe1",  "k562_train", "k562_test")) +
+    small_axis(label = "PCA", xlim = c(-9, 11), ylim = c(-6, 11), fontsize = font_size_tiny) +
+    labs(subtitle = "K562 perturbations (aligned)") +
+    theme(plot.subtitle = element_text(hjust = 0.5))
+
+projection_legend <- cowplot::get_plot_component(
+  merged_pl + 
+    labs(color = "") +
+    guides(color = guide_legend(override.aes = list(size = 2, alpha = 1))) +
+    theme(legend.position = "bottom", legend.direction = "horizontal"),
+  "guide-box",return_all = TRUE
+) %>%
+  purrr::discard(\(x) ggplot2:::is.zero(x)) %>%
+  magrittr::extract2(1)
+
+rpe1_initial_pl
+merged_pl
+```
+
+
+
+
+
+```{r}
+plot_assemble(
+  add_text("(A) Pearson correlation predicted vs.\\ observed change over baseline", x = 2.7, y = 1, fontsize = font_size, vjust = 1, fontface = "bold"),
+  add_plot(main_pl_double, x = 0, y = 4, width = 46, height = 47.5),
+  add_plot(main_pl_single, x = 43, y = 4, width = 124, height = 49),
+
+  add_text("(B) Prediction of non-additive perturbation effects", x = 2.7, y = 54, fontsize = font_size, vjust = 1, fontface = "bold"),
+  add_plot(pert_pred_comparison, x = 0, y = 57, width = 90, height = 50),
+
+  add_text("(C) Pretrained model (predicting RPE1 with K562 data)", x = 94.7, y = 54, fontsize = font_size, vjust = 1, fontface = "bold"),
+  add_plot(rpe1_initial_pl, x = 92, y = 57, width = 40, height = 40),
+  add_plot(merged_pl + guides(color = "none", fill = "none"), x = 132, y = 57, width = 40, height = 40),
+  add_plot(projection_legend, x = 115, y = 97, width = 30, height = 5),
+
+  width = 170, height = 107, units = "mm", show_grid_lines = FALSE,
+  latex_support = TRUE, filename = "../plots/perturbation_prediction.pdf"
+)
+```
+
+
+# Parameter sweep
+
+```{r, paged.print=FALSE}
+sweep_df <- read_tsv("../benchmark/output/perturbation_prediction_parameters_sweep.tsv.gz")
+sweep_df
+```
+
+
+```{r}
+sweep_df$ridge_penalty |> table()
+
+```
+
+
+```{r, paged.print=FALSE}
+sweep_df_red <- sweep_df %>%
+  # filter(ridge_penalty != 0.01 & ridge_penalty != 10) %>%
+  mutate(ridge_penalty = round(ridge_penalty, 1)) %>%
+  mutate(training = ifelse(training == "train", "training", "testing")) %>%
+  mutate(training = factor(training, levels = c("training", "testing"))) %>%
+  summarize(across(c(cor, dist, delta_cor), \(x) mean(x, na.rm=TRUE)), .by = c(name, dataset_name, seed, ridge_penalty, pca_dim, training)) 
+
+make_sweep_plot <- function(dataset, metric, subtitle, ylab){
+  sweep_df_red %>%
+    filter(dataset_name == dataset) %>%
+    ggplot(aes(x = pca_dim, y = {{metric}})) +
+      geom_point(aes(color = as.factor(ridge_penalty)), size = 0.1) +
+      geom_smooth(aes(color = as.factor(ridge_penalty), group = as.factor(ridge_penalty)), se = FALSE, linewidth = 0.5) +
+      scale_x_log10() +
+      colorspace::scale_color_discrete_qualitative(h1 = 70, h2 = 230, c = 60, l = 70) +
+      facet_grid(vars(training), vars(name))  +
+      labs(x = "No. PCA dimensions", y = ylab,
+           subtitle = subtitle, color = "Ridge penalty") +
+      theme(panel.spacing.x = unit(4, "mm"), panel.spacing.y = unit(2, "mm"),
+            panel.grid.major.y = element_line(color = "lightgrey", linewidth = 0.2))
+}
+
+pl1 <- make_sweep_plot("adamson", delta_cor, subtitle = "Adamson Data", ylab = "Pearson-delta")
+pl2 <- make_sweep_plot("replogle_rpe1_essential", delta_cor, subtitle = "Replogle RPE1 Data", ylab = "Pearson-delta")
+pl3 <- make_sweep_plot("adamson", dist, subtitle = "Adamson Data", ylab = "Distance")
+pl4 <- make_sweep_plot("replogle_rpe1_essential", dist, subtitle = "Replogle RPE1 Data", ylab = "Distance")
+```
+
+```{r}
+plot_assemble(
+  add_text("(A) Pearson correlation predicted vs.\\ observed change over baseline", x = 2.7, y = 1, fontsize = font_size, vjust = 1, fontface = "bold"),
+  add_plot(pl1 + guides(color = "none"), x = 0, y = 3, width = 70, height = 40),
+  add_plot(pl2, x = 70, y = 3, width = 85, height = 40),
+
+  add_text("(B) Distance predicted vs.\\ observed", x = 2.7, y = 44, fontsize = font_size, vjust = 1, fontface = "bold"),
+  add_plot(pl3 + guides(color = "none"), x = 0, y = 46, width = 70, height = 40),
+  add_plot(pl4, x = 70, y = 46, width = 85, height = 40),
+
+  add_text("(C) Pretraining matching error vs prediction accuracy", x = 2.7, y = 87, fontsize = font_size, vjust = 1, fontface = "bold"),
+  add_plot(pretraining_overfitting_example, x = 0, y = 90, width = 100, height = 35),
+
+  
+  width = 170, height = 125, units = "mm", show_grid_lines = FALSE,
+  latex_support = TRUE, filename = "../plots/suppl_perturbation_parameter_sweep.pdf"
+)
+
+```
+
+
+
+# Session Info
+
+```{r}
+sessionInfo()
+```
+
