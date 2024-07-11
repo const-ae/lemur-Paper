@@ -91,9 +91,22 @@ celltype_specific_plt <- as_tibble(colData(fit_subset)) %>%
   cowplot::plot_grid(plotlist = ., nrow = 1, rel_widths = c(1, 0.5))
 
 comb_cell_type_pl <- cowplot::plot_grid(celltype_broad_plt, celltype_specific_plt, nrow = 1, rel_widths = c(1.1, 2))
-cowplot::save_plot("../plots/suppl_zebrafish_cell_types.pdf", comb_cell_type_pl, base_height = 8, base_width = 17, units = "cm", ncol = 1)
+comb_cell_type_pl
 ```
 
+
+```{r, paged.print=FALSE}
+as_tibble(colData(fit_subset)) %>%
+  mutate(umap = umaps$umap_all) %>%
+  filter(cell_type_broad == "periderm") %>%
+  dplyr::count(tissue, cell_type_broad, cell_type_sub) %>%
+  arrange(cell_type_sub)
+```
+
+
+```{r}
+fit_subset
+```
 
 
 
@@ -267,19 +280,53 @@ kerat_expr_df <- as_tibble(colData(fit_subset)) %>%
 kerat_expr_pl <- ggplot(kerat_expr_df, aes(x = umap[,1], y = umap[,2])) +
     ggrastr::rasterize(geom_point(aes(color = expr), size = 0.1, stroke = 0, show.legend = TRUE), dpi = 600) +
     geom_point(data = tibble(umap = umaps$umap_inter2[sel_pos,], position = seq(0, 1, l = n_pos)), aes(fill = position), shape = 21, 
-               color = "black", size = 1.8, stroke = 0.2, show.legend = FALSE) +
+               color = "black", size = 1.2, stroke = 0.05, show.legend = FALSE) +
     colorspace::scale_fill_continuous_divergingx(palette = "Tropic", mid = 0.5) +
     scale_color_gradient(low = "lightgrey", high = "#3d2892", limits = c(0, quantile(logcounts(fit_subset)["ENSDARG00000058358",], c(0.95))), oob = scales::oob_squish) +
     facet_wrap(vars(timepoint_brackets), nrow = 1) +
     small_axis(label = "UMAP", fontsize = font_size_small, 
                xlim = scales::expand_range(quantile(kerat_expr_df$umap[,1], c(0.05, 0.95)), mul = 0.5),
                ylim = scales::expand_range(quantile(kerat_expr_df$umap[,2], c(0.05, 0.95)), mul = 0.5)) +
-    labs(title = "Gene expression of \\emph{krt8} in the periderm over time")
+    labs(title = "(B) Gene expression of \\emph{krt8} in the periderm over time")
 
+kerat_expr_pl
+```
+
+
+```{r, paged.print=FALSE}
+nrxn2a_expr_df <- as_tibble(colData(fit_subset)) %>%
+  mutate(timepoint_brackets = timepoint_brackets) %>%
+  mutate(umap = umaps$umap_all) %>%
+  mutate(expr = logcounts(fit_subset)["ENSDARG00000061454",]) %>%
+  filter(tissue == "Central Nervous System")
+  
+
+nrxn2a_expr_pl <- ggplot(nrxn2a_expr_df, aes(x = umap[,1], y = umap[,2])) +
+    ggrastr::rasterize(geom_point(aes(color = expr), size = 0.1, stroke = 0, show.legend = TRUE), dpi = 600) +
+    geom_point(data = tibble(umap = umaps$umap_inter1[sel_pos,], position = seq(0, 1, l = n_pos)), aes(fill = position), shape = 21, 
+               color = "black", size = 1.2, stroke = 0.05, show.legend = FALSE) +
+    colorspace::scale_fill_continuous_divergingx(palette = "Zissou1", mid = 0.5) +
+    scale_color_gradient(low = "lightgrey", high = "#3d2892", limits = c(0, quantile(logcounts(fit_subset)["ENSDARG00000061454",], c(0.95))), oob = scales::oob_squish) +
+    facet_wrap(vars(timepoint_brackets), nrow = 1) +
+    small_axis(label = "UMAP", fontsize = font_size_small, 
+               xlim = scales::expand_range(quantile(nrxn2a_expr_df$umap[,1], c(0.05, 0.95)), mul = 0.5),
+               ylim = scales::expand_range(quantile(nrxn2a_expr_df$umap[,2], c(0.05, 0.95)), mul = 0.5)) +
+    labs(title = "(C) Gene expression of \\emph{nrxn2a} in the periderm over time")
+
+nrxn2a_expr_pl
+```
+
+
+
+```{r, paged.print=FALSE}
+# cowplot::save_plot("../plots/suppl_zebrafish_cell_types.pdf", comb_cell_type_pl, base_height = 8, base_width = 17, units = "cm", ncol = 1)
 plot_assemble(
-  add_plot(kerat_expr_pl, x = 0, y = 1, width = 170, height = 50),
-  width = 170, height = 50, units = "mm", show_grid_lines = FALSE,
-  latex_support = TRUE, filename = "../plots/suppl_kerat_expr_plot.pdf"
+  add_plot(comb_cell_type_pl, x = 0, y = 3, width = 170, height = 90),
+  add_plot(kerat_expr_pl, x = 0, y = 90, width = 170, height = 60),
+  add_plot(nrxn2a_expr_pl, x = 0, y = 150, width = 170, height = 30),
+  
+  width = 170, height = 180, units = "mm", show_grid_lines = FALSE,
+  latex_support = TRUE, filename = "../plots/suppl_zebrafish_plot.pdf"
 )
 ```
 
@@ -296,7 +343,7 @@ plot_assemble(
   add_plot(pred_plot2  + theme(legend.position = "none"), x = 60, y = 55+30.5, width = 110, height = 30.5),
 
   width = 170, height = 116, units = "mm", show_grid_lines = FALSE,
-  latex_support = TRUE, filename = "../plots/continuous_covar_figure.pdf"
+  latex_support = TRUE, filename = "../plots/zebrafish.pdf"
 )
 
 ```
