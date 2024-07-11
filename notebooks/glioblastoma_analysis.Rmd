@@ -89,13 +89,14 @@ cell_type_dot_plot <- as_tibble(as.matrix(t(expr_mat))) %>%
     coord_cartesian(clip = "off") +
     guides(color = guide_colorbar(barheight = unit(1, "mm"), barwidth = unit(5, "mm"), title.vjust = 0.25, label.position = "top", label.vjust = -2),
            size = guide_bins(label.vjust = -11)) +
-    theme(axis.title = element_blank(), legend.position = c(0,-0.3), legend.direction = "horizontal",
+    theme(axis.title = element_blank(), legend.position = c(0,-0.2), legend.direction = "horizontal",
           legend.box = "horizontal", legend.text = element_text(size = font_size_tiny),
           strip.background = element_blank(), strip.text = element_blank(), panel.spacing.y = unit(1.5, "mm")) +
-    labs(size = "$\\text{frac}[y \\neq 0]$", color = "expr.")
+    labs(size = "$\\text{frac}[y \\neq 0]$", color = "expression")
 
 cell_type_dot_plot
 ```
+
 
 ```{r, paged.print=FALSE}
 chr_ratio_pl <- colData(fit_small) %>%
@@ -110,17 +111,30 @@ chr_ratio_pl <- colData(fit_small) %>%
     scale_x_continuous(expand = expansion(0), breaks = c(0, 1, 2)) +
     scale_fill_manual(values = c("TRUE" = unname(cell_type_colors["Tumor cells"]), "FALSE" = "#888888")) +
     coord_cartesian(xlim = c(0, 2.1)) +
-    labs(y = "No. cells") +
-    theme(axis.title.x = element_blank(), axis.text.y = element_blank(), axis.ticks.y = element_blank())
+    labs(x = "Expression ratio vs chr. 1-5", y = "No. cells") +
+    theme(axis.text.y = element_blank(), axis.ticks.y = element_blank())
 
 chr_ratio_pl
 ```
 
+```{r}
+# new_sel_genes <- c("HIST3H2A", "LMO2", "EPC1", "PTPRZ1", "HBEGF", "SPATA13", "MBP")
+# gene2id <- deframe(full_row_data[,c("gene", "gid")])
+# ctrl_proj <- lemur:::grassmann_map(lemur:::sum_tangent_vectors(fit_small$coefficients, c(1, 0, 0, rep(0, times = 5))), fit_small$base_point)[,1:2]
+# pan_proj <- lemur:::grassmann_map(lemur:::sum_tangent_vectors(fit_small$coefficients, c(1, 0, 1, rep(0, times = 5))), fit_small$base_point)[,1:2]
+# 
+# rownames(ctrl_proj) <- full_row_data$gid
+# rownames(pan_proj) <- full_row_data$gid
+# 
+# sqrt(rowSums2(ctrl_proj[gene2id[new_sel_genes],]^2))
+# sqrt(rowSums2(pan_proj[gene2id[new_sel_genes],]^2))
+```
 
 
 
 ```{r, paged.print=FALSE}
-sel_genes <- c("CD14", "PLP1", "GAP43", "HIST3H2A")
+sel_genes <- c("CD14", "PLP1", "GAP43", "HIST3H2A", "EPC1")
+is_marker_gene <- c("CD14" = TRUE, "PLP1" = TRUE, "GAP43" = TRUE, "HIST3H2A" = FALSE)
 
 top_dirs <- deframe(full_row_data[,c("gene", "gid")])[sel_genes]
 
@@ -151,38 +165,82 @@ manual_text_pos <- tribble(
 # eto_proj_df <- as_tibble(eto_proj[top_dirs,] * c(rep(200, 3), 2000), rownames = "gid") %>%
 #   left_join(as_tibble(full_row_data))
 
+z_base_space <- as_tibble(colData(fit_small)) %>%
+  mutate(emb = t(fit_small$embedding[1:2,])) %>%
+  ggplot(aes(x = emb[,1], y = emb[,2])) +
+    ggrastr::rasterize(geom_point(aes(color = cell_type), size = 0.07, stroke = 0, show.legend = FALSE), dpi = 600) +
+    scale_color_manual(values = cell_type_colors) +
+    small_axis(label = "$Z$ space", xlim = c(-18, 40), ylim = c(-20, 25)) +
+    labs(subtitle = "LEMUR's latent space ($Z$)\ncolored by cell type")
+
 
 mc_biplot_marker <- as_tibble(colData(fit_small)) %>%
   mutate(emb = t(fit_small$embedding[1:2,])) %>%
   ggplot(aes(x = emb[,1], y = emb[,2])) +
-    ggrastr::rasterize(geom_point(aes(color = cell_type), size = 0.01, stroke = 0, show.legend = FALSE), dpi = 600) +
+    ggrastr::rasterize(geom_point(aes(color = cell_type), size = 0.07, stroke = 0, show.legend = FALSE), dpi = 600) +
     scale_color_manual(values = cell_type_colors) +
     ggnewscale::new_scale_colour() +
-    geom_segment(data = proj_df %>% filter(gene != "HIST3H2A"), aes(x = 0, y = 0, xend = V1 * 200, yend = V2 * 200, color = condition), linewidth = 1.2, show.legend = FALSE) +
-    geom_point(data = proj_df %>% filter(gene != "HIST3H2A") %>% arrange(desc(condition)), aes(x = V1 * 200, y = V2 * 200, color = condition), size = 0.6, show.legend = FALSE) +
+    geom_segment(data = proj_df %>% filter(is_marker_gene[gene]), aes(x = 0, y = 0, xend = V1 * 200, yend = V2 * 200, color = condition), linewidth = 1.2, show.legend = FALSE) +
+    geom_point(data = proj_df %>% filter(is_marker_gene[gene]) %>% arrange(desc(condition)), aes(x = V1 * 200, y = V2 * 200, color = condition), size = 0.6, show.legend = FALSE) +
     scale_color_manual(values = condition_colors) +
-    geom_text(data = manual_text_pos %>% filter(gene != "HIST3H2A"), aes(x = V1, y = V2, hjust = hjust, vjust = vjust, label = gene_label), size = font_size_small / .pt) +
+    geom_text(data = manual_text_pos %>% filter(is_marker_gene[gene]), aes(x = V1, y = V2, hjust = hjust, vjust = vjust, label = gene_label), size = font_size_small / .pt) +
     # coord_fixed(ylim = c(-20, 25), xlim = c(-40, 20), clip = "off") +
-    small_axis(label = "$Z$ space", xlim = c(-40, 40), ylim = c(-20, 25)) +
-    labs(x = "$Z_1$", y ="$Z_2$")
+    small_axis(label = "$Z$ space", xlim = c(-18, 40), ylim = c(-20, 25)) +
+    labs(subtitle = "Marker genes projected on $Z$")
     
 mc_biplot_diff <- as_tibble(colData(fit_small)) %>%
   mutate(emb = t(fit_small$embedding[1:2,])) %>%
   ggplot(aes(x = emb[,1], y = emb[,2])) +
-    ggrastr::rasterize(geom_point(aes(color = cell_type), size = 0.01, stroke = 0, show.legend = FALSE), dpi = 600) +
+    ggrastr::rasterize(geom_point(aes(color = cell_type), size = 0.07, stroke = 0, show.legend = FALSE), dpi = 600) +
     scale_color_manual(values = cell_type_colors) +
     ggnewscale::new_scale_colour() +
-    geom_segment(data = proj_df %>% filter(gene == "HIST3H2A") %>% arrange(desc(condition)), aes(x = 0, y = 0, xend = V1 * 2000, yend = V2 * 2000, color = condition), linewidth = 1.2, show.legend = FALSE) +
-    geom_point(data = proj_df %>% filter(gene == "HIST3H2A") %>% arrange(desc(condition)), aes(x = V1 * 2000, y = V2 * 2000,color = condition), size = 0.6, show.legend = FALSE) +
+    geom_segment(data = proj_df %>% filter(!is_marker_gene[gene]) %>% arrange(desc(condition)), aes(x = 0, y = 0, xend = V1 * 2000, yend = V2 * 2000, color = condition),
+                 linewidth = 1.2, show.legend = FALSE) +
+    geom_point(data = proj_df %>% filter(!is_marker_gene[gene]) %>% arrange(desc(condition)), aes(x = V1 * 2000, y = V2 * 2000,color = condition), size = 0.6, show.legend = FALSE) +
     scale_color_manual(values = condition_colors) +
-    geom_text(data = manual_text_pos %>% filter(gene == "HIST3H2A"), aes(x = V1, y = V2, hjust = hjust, vjust = vjust, label = gene_label), size = font_size_small / .pt) +
+    geom_text(data = manual_text_pos %>% filter(!is_marker_gene[gene]), aes(x = V1, y = V2, hjust = hjust, vjust = vjust, label = gene_label), size = font_size_small / .pt) +
     # coord_fixed(ylim = c(-20, 25), xlim = c(-40, 20), clip = "off") +
-    small_axis(label = "$Z$ space", xlim = c(-40, 40), ylim = c(-25, 20)) +
-    labs(x = "$Z_1$", y ="$Z_2$")
+    small_axis(label = "$Z$ space", xlim = c(-18, 40), ylim = c(-25, 20)) +
+    labs(subtitle = "Gene with large expression change projected on $Z$")
 
 mc_biplot_marker
 mc_biplot_diff
 ```
+
+```{r}
+cell_type_legend_suppl <- ggplot(enframe(cell_type_colors), aes(x = 0, y = 0, color = name)) + 
+  geom_point() + 
+  scale_color_manual(values = cell_type_colors, name = "Cell types") +
+  theme(legend.position = "bottom", legend.title = element_text(size = font_size_small))
+
+annotation_pl <- cowplot::ggdraw() +
+  cowplot::draw_label(x = 0.8, y = 0.1, label = "Three other cell types", size = font_size_small, hjust = 0) +
+  cowplot::draw_line(x = c(0.9,  0.71), y = c(0.15, 0.5), size = 0.25) +
+  cowplot::draw_label(x = 1, y = 0.6, label = "Tumor cells", size = font_size_small, hjust = 0, vjust = 0.5) +
+  cowplot::draw_line(x = c(1, 0.82), y = c(0.6, 0.55), size = 0.2) 
+```
+
+
+```{r, paged.print=FALSE}
+plot_assemble(add_text("(A) Glioblastoma cell type assignment", x = 1.5, y = 1.5, vjust = 1, fontsize = font_size, fontface = "bold"),
+              add_plot(cowplot::get_legend(cell_type_legend_suppl), x = 3, y = 5, height = 5),
+              add_plot(cell_type_dot_plot , x = 0, y = 10, width = 70, height = 40),
+              
+              add_text("(B) Aneuploidie", x = 95, y = 1.5, vjust = 1, fontsize = font_size, fontface = "bold"),
+              add_plot(chr_ratio_pl, x = 95, y = 7, width = 60, height = 28),
+              add_plot(annotation_pl, x = 95, y = 7, width = 60, height = 32),
+              
+              add_text("(C) Multi-condition biplots", x = 1.5, y = 62, vjust = 1, fontsize = font_size, fontface = "bold"),
+              add_plot(z_base_space,  x = 0, y = 65, width = 55, height = 40),
+              add_plot(mc_biplot_marker, x = 55, y = 65, width = 55, height = 40),
+              add_plot(mc_biplot_diff, x = 110, y = 65, width = 55, height = 40),
+              
+              width = 170, height = 110, units = "mm", show_grid_lines = FALSE, latex_support = TRUE,
+              filename = "../plots/suppl_glioblastoma_celltype_annotation.pdf")
+```
+
+
+
 
 
 Make UMAPs
@@ -731,43 +789,23 @@ plot_assemble(
   add_plot(umap_fit_ct_pl, x = 25 + row1_umap_width * 1, y = 70, width = row1_umap_width, height = 40),
   add_plot(umap_fital_ct_pl, x = 25 + row1_umap_width * 2, y = 70, width = row1_umap_width, height = 40),
 
-  add_text("(C) Cell type assignment", x = 1.5, y = 111, vjust = 1, fontsize = font_size, fontface = "bold"),
-  add_plot(cell_type_dot_plot + guides() , x = 0, y = 114, width = 47, height = 26),
-  add_plot(chr_ratio_pl, x = 7, y = 144, width = 40, height = 13),
-
-  add_text("(D) Multi-condition biplot", x = 49, y = 111, vjust = 1, fontsize = font_size, fontface = "bold"),
-  add_text("Marker Genes", x = 70, y = 114.8, hjust = 0.5, vjust = 1, fontsize = font_size_small),
-  add_plot(mc_biplot_marker, x = 47, y = 114.5, width = 42, height = 20),
-  add_text("Diff. Gene", x = 70, y = 134.8, hjust = 0.5, vjust = 1, fontsize = font_size_small),
-  add_plot(mc_biplot_diff, x = 47, y = 134.5, width = 42, height = 20),
-   
-  add_text("(E) Predicted differential expression of \\emph{HIST3H2A} for each cell", x = 86.5, y = 111, vjust = 1, fontsize = font_size, fontface = "bold"),
-  add_plot(de_plot_full + labs(subtitle = "Pred. DE for each cell") + theme(plot.subtitle = element_text(size = font_size_small, hjust = 0.5)) + guides(color = "none"), x = 86, y = 113.5, width = 33, height = 34),
-  add_plot(de_plot_split + guides(color = "none"), x = 115, y = 112.5, width = 30, height = 35),
-  add_plot(hist3h2a_legend, x = 100.5, y = 147, width = 30, height = 5),
-  add_text("down", x = 101, y = 146.9, vjust = 1, fontsize = font_size_small, hjust = 1),
-  add_text("regulation", x = 101, y = 148.9, vjust = 1, fontsize = font_size_small, hjust = 1),
-  add_text("up", x = 125.5, y = 146.9, vjust = 1, fontsize = font_size_small, hjust = 0),
-  add_text("regulation", x = 125.5, y = 148.9, vjust = 1, fontsize = font_size_small, hjust = 0),
-  add_plot(comparison_pl, x = 142, y = 113.5, width = 28, height = 37),
-
-  add_text("(F) Panobinostat down-regulates \\emph{LMO2} in a subpopulation of tumor cells", x = 1.5, y = 158, vjust = 1, fontsize = font_size, fontface = "bold"),
-  add_plot(de_plots2 + guides(color = "none"), x = 0, y = 160, width = 61, height = 40),
-  add_plot(lmo2_legend, x = 16.5, y = 198, width = 30, height = 5),
-  add_text("down", x = 16, y = 197.9, vjust = 1, fontsize = font_size_small, hjust = 1),
-  add_text("regulation", x = 16, y = 199.9, vjust = 1, fontsize = font_size_small, hjust = 1),
-  add_text("up", x = 40.5, y = 197.9, vjust = 1, fontsize = font_size_small, hjust = 0),
-  add_text("regulation", x = 40.5, y = 199.9, vjust = 1, fontsize = font_size_small, hjust = 0),
-  add_plot(comparison_pl2, x = 61, y = 161, width = 45, height = 41.8),
-  add_plot(diff_pl, x = 104, y = 162, width = 25, height = 40.5),
+  add_text("(C) Panobinostat down-regulates \\emph{LMO2} in a subpopulation of tumor cells", x = 1.5, y = 111, vjust = 1, fontsize = font_size, fontface = "bold"),
+  add_plot(de_plots2 + guides(color = "none"), x = 0, y = 113, width = 61, height = 40),
+  add_plot(lmo2_legend, x = 16.5, y = 151, width = 30, height = 5),
+  add_text("down", x = 16, y = 150.9, vjust = 1, fontsize = font_size_small, hjust = 1),
+  add_text("regulation", x = 16, y = 152.9, vjust = 1, fontsize = font_size_small, hjust = 1),
+  add_text("up", x = 40.5, y = 150.9, vjust = 1, fontsize = font_size_small, hjust = 0),
+  add_text("regulation", x = 40.5, y = 152.9, vjust = 1, fontsize = font_size_small, hjust = 0),
+  add_plot(comparison_pl2, x = 61, y = 114, width = 45, height = 41.8),
+  add_plot(diff_pl, x = 104, y = 115, width = 25, height = 40.5),
 
 
-  add_text("(G) Characterization of tumor\n\\quad\\quad subpopulation", x = 130, y = 158, vjust = 1, fontsize = font_size, fontface = "bold"),
+  add_text("(D) Characterization of tumor\n\\quad\\quad subpopulation", x = 130, y = 111, vjust = 1, fontsize = font_size, fontface = "bold"),
   add_plot(cowplot::get_legend(volcano_enrichment_pl + guides(color = guide_legend(override.aes = list(size = 1))) + labs(color = "")),
-           x = 133, y = 164.5, width = 36, height = 4),
-  add_plot(volcano_enrichment_pl + guides(color = "none"), x = 129, y = 168, width = 41, height = 37),
+           x = 133, y = 117, width = 36, height = 4),
+  add_plot(volcano_enrichment_pl + guides(color = "none"), x = 129, y = 119, width = 41, height = 39),
   
-  width = 170, height = 205, units = "mm", show_grid_lines = FALSE, latex_support = TRUE,
+  width = 170, height = 159, units = "mm", show_grid_lines = FALSE, latex_support = TRUE,
   filename = "../plots/glioblastoma_results.pdf")
 ```
 
