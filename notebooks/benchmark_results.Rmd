@@ -848,7 +848,7 @@ plot_assemble(
   add_plot(int_bio_pl, x = 113, y = 5, width = 55, height = 42),
 
   add_plot(ct_scatter_plot + guides(color = "none"), x = 0, y = 50, width = 110, height = 40),
-  add_plot(cowplot::get_legend(ct_scatter_plot) , x = 10, y = 88, width = 75, height = 10),
+  add_plot(my_get_legend(ct_scatter_plot) , x = 10, y = 88, width = 75, height = 10),
   add_plot(perf_pred_plot, x = 113, y = 50, width = 55, height = 40),
   
   add_text("(E) Simulated DE", x = 2.7, y = 101.4, fontsize = font_size, vjust = 1, fontface = "bold"),
@@ -858,7 +858,7 @@ plot_assemble(
   add_plot(de_pred_pl, x = 53, y = 100, width = 40, height = 45),
   add_plot(de_nei_pl, x = 83, y = 100, width = 35, height = 45),
   add_plot(prec_recall_plot + guides(color = "none"), x = 113, y = 100, width = 55, height = 42),
-  add_plot(cowplot::get_legend(prec_recall_plot), x = 115, y = 140, width = 50, height = 5),
+  add_plot(my_get_legend(prec_recall_plot), x = 115, y = 140, width = 50, height = 5),
   
   add_plot(fdr_control_plot, x = 0, y = 150, width = 40, height = 55),
   add_plot(power_plot, x = 40, y = 150, width = 68, height = 55),

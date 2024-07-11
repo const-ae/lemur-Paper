@@ -316,18 +316,18 @@ expr_comparison_pl
 plot_assemble(
   add_text("(A) ", x = 0.5, y = 1, fontsize = font_size, vjust = 1, fontface = "bold"),
   add_text("Amyloid-$\\beta$ density", x = 6, y = 2, fontsize = font_size, vjust = 1, fontface = "plain"),
-  add_plot(cowplot::get_legend(amb_sp), x = 37, y = 3, height = 5, width = 1),
+  add_plot(my_get_legend(amb_sp), x = 37, y = 3, height = 5, width = 1),
   add_plot(amb_sp + guides(color = "none"),   x = 2,   y = 5, width = 23, height = 45),
   add_plot(amb_umap, x = 22,  y = 5, width = 33, height = 45),
 
   add_text("(B) ", x = 56, y = 1, fontsize = font_size, vjust = 1, fontface = "bold"),
-  add_plot(cowplot::get_legend(ct_sp), x = 84, y = 0.5, height = 5, width = 1),
+  add_plot(my_get_legend(ct_sp), x = 84, y = 0.5, height = 5, width = 1),
   add_plot(ct_sp + guides(color = "none"),    x = 58,  y = 5, width = 23, height = 45),
   add_plot(ct_umap,  x = 78,  y = 5, width = 33, height = 45),
 
   add_text("(C) ", x = 112, y = 1, fontsize = font_size, vjust = 1, fontface = "bold"),
   add_text("\\emph{Jun} differential expression", x = 118, y = 2, fontsize = font_size, vjust = 1, fontface = "plain"),
-  add_plot(cowplot::get_legend(de_sp), x = 159, y = 3, height = 5, width = 1),
+  add_plot(my_get_legend(de_sp), x = 159, y = 3, height = 5, width = 1),
   add_plot(de_sp + guides(color = "none"),    x = 114, y = 5, width = 23, height = 45),
   add_plot(de_umap,  x = 134, y = 5, width = 33, height = 45),
 

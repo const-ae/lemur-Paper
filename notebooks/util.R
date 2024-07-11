@@ -33,6 +33,11 @@ options(tikzLatexPackages = union(
   ))
 )
 
+my_get_legend <- function(plot){
+  comps <- cowplot::get_plot_component(plot,  "guide-box",return_all = TRUE)
+  comps <-  purrr::discard(comps, \(x) ggplot2:::is.zero(x))
+  comps[[1]]
+}
 
 
 small_axis <- function(label = NULL, fontsize = 7, arrow_length = 10, label_offset = 1, fix_coord = TRUE, remove_axes = TRUE,

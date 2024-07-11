@@ -743,27 +743,36 @@ sum(fit_small$colData$cell_type == "Tumor cells") - sum(filter(is_inside2, gene 
 
 
 ```{r}
-cell_type_legend <- ggplot(enframe(cell_type_colors), aes(x = 0, y = 0, color = name)) + 
-  geom_point() + 
-  scale_color_manual(values = cell_type_colors, name = "Cell types") +
-  theme(legend.position = "left", legend.title = element_text(size = font_size))
+cell_type_legend <- my_get_legend(
+  ggplot(enframe(cell_type_colors), aes(x = 0, y = 0, color = name)) + 
+    geom_point() + 
+    scale_color_manual(values = cell_type_colors, name = "Cell types") +
+    theme(legend.position = "left", legend.title = element_text(size = font_size)))
 
-condition_legend <- ggplot(enframe(condition_colors) %>% filter(name != "etoposide"), aes(x = 0, y = 0, color = name)) + 
-  geom_point() + 
-  scale_color_manual(values = condition_colors, name = "Conditions") +
-  theme(legend.position = "left", legend.title = element_text(size = font_size))
+condition_legend <- my_get_legend(
+  ggplot(enframe(condition_colors) %>% filter(name != "etoposide"), aes(x = 0, y = 0, color = name)) + 
+    geom_point() + 
+    scale_color_manual(values = condition_colors, name = "Conditions") +
+    theme(legend.position = "left", legend.title = element_text(size = font_size)))
+  
+# hist3h2a_legend <- cowplot::get_legend({
+#   de_plot_full +
+#     guides(color = guide_colorbar(title = "", label.theme = element_text(size = font_size_tiny, margin = margin(t = 0 , unit = "mm")), 
+#                                  barheight = unit(1.5, "mm"), barwidth = unit(23, "mm")))
+# })
 
-hist3h2a_legend <- cowplot::get_legend({
-  de_plot_full +
-    guides(color = guide_colorbar(title = "", label.theme = element_text(size = font_size_tiny, margin = margin(t = 0 , unit = "mm")), 
-                                 barheight = unit(1.5, "mm"), barwidth = unit(23, "mm")))
-})
-
-lmo2_legend <- cowplot::get_legend({
+lmo2_legend <- my_get_legend({
   de_plots2 +
     guides(color = guide_colorbar(title = "", label.theme = element_text(size = font_size_tiny, margin = margin(t = 0 , unit = "mm")), 
                                  barheight = unit(1.5, "mm"), barwidth = unit(21, "mm")))
 })
+
+volcano_legend <- my_get_legend({
+  volcano_enrichment_pl + 
+    guides(color = guide_legend(override.aes = list(size = 1))) + 
+    labs(color = "")
+})
+
 ```
 
 
@@ -776,7 +785,7 @@ plot_assemble(
   add_graphic("../illustrations/glioblastoma_experiment_overview_wideArtboard 1.pdf", x = 1.5,  y = 2.5, units = "mm"),
   
   add_text("(B) Alignment with LEMUR adjusting for patient and treatment effect", x = 1.5, y = 24.5, vjust = 1, fontsize = font_size, fontface = "bold"),
-  add_plot(cowplot::get_legend(condition_legend), x = 3, y = 31 , height = 34),
+  add_plot(condition_legend, x = 3, y = 31 , height = 34),
   add_text("UMAP of $\\matr{Y}$", x = 25 + row1_umap_width * 0.5, y = 30, vjust = 1, hjust = 0.5, fontsize = 7),
   add_text("UMAP of $\\matr{Z}$ if $\\matr{S} = I$", x = 25 + row1_umap_width * 1.5, y = 30, vjust = 1, hjust = 0.5, fontsize = 7),
   add_text("UMAP of $\\matr{Z}$ if $\\matr{S}$ estimated with Harmony", x = 25 + row1_umap_width * 2.5, y = 30, vjust = 1, hjust = 0.5, fontsize = 7),
@@ -784,7 +793,7 @@ plot_assemble(
   add_plot(umap_fit_pc_pl, x = 25 + row1_umap_width * 1, y = 31, width = row1_umap_width, height = 40),
   add_plot(umap_fital_pc_pl, x = 25 + row1_umap_width * 2, y = 31, width = row1_umap_width, height = 40),
 
-  add_plot(cowplot::get_legend(cell_type_legend), x = 3, y = 70, height = 40),
+  add_plot(cell_type_legend, x = 3, y = 70, height = 40),
   add_plot(umap_orig_ct_pl, x = 25 + row1_umap_width * 0, y = 70, width = row1_umap_width, height = 40),
   add_plot(umap_fit_ct_pl, x = 25 + row1_umap_width * 1, y = 70, width = row1_umap_width, height = 40),
   add_plot(umap_fital_ct_pl, x = 25 + row1_umap_width * 2, y = 70, width = row1_umap_width, height = 40),
@@ -801,8 +810,7 @@ plot_assemble(
 
 
   add_text("(D) Characterization of tumor\n\\quad\\quad subpopulation", x = 130, y = 111, vjust = 1, fontsize = font_size, fontface = "bold"),
-  add_plot(cowplot::get_legend(volcano_enrichment_pl + guides(color = guide_legend(override.aes = list(size = 1))) + labs(color = "")),
-           x = 133, y = 117, width = 36, height = 4),
+  add_plot(volcano_legend, x = 133, y = 117, width = 36, height = 4),
   add_plot(volcano_enrichment_pl + guides(color = "none"), x = 129, y = 119, width = 41, height = 39),
   
   width = 170, height = 159, units = "mm", show_grid_lines = FALSE, latex_support = TRUE,
