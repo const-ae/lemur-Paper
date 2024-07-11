@@ -145,9 +145,22 @@ structure_conservation <- function(large_data, embedding, is_gr1){
   clustering_emb_cut <- igraph::cut_at(clustering_emb$objects$communities, 
                                        no = length(unique(clustering_ref_gr1)))
   list(
-    ARI = aricode::ARI(clustering_ref_gr1, clustering_emb_cut),
-    AMI = aricode::AMI(clustering_ref_gr1, clustering_emb_cut),
-    NMI = aricode::NMI(clustering_ref_gr1, clustering_emb_cut)
+    ARI_onlog = aricode::ARI(clustering_ref_gr1, clustering_emb_cut),
+    AMI_onlog = aricode::AMI(clustering_ref_gr1, clustering_emb_cut),
+    NMI_onlog = aricode::NMI(clustering_ref_gr1, clustering_emb_cut)
+  )
+}
+
+structure_conservation2 <- function(noint_embedding, embedding, is_gr1){
+  clustering_ref_gr1 <- bluster::clusterRows(t(noint_embedding[,is_gr1]), bluster::KNNGraphParam())
+  clustering_emb <- bluster::clusterRows(t(embedding[,is_gr1]), bluster::KNNGraphParam(), 
+                                         full = TRUE)
+  clustering_emb_cut <- igraph::cut_at(clustering_emb$objects$communities, 
+                                       no = length(unique(clustering_ref_gr1)))
+  list(
+    ARI_onself = aricode::ARI(clustering_ref_gr1, clustering_emb_cut),
+    AMI_onself = aricode::AMI(clustering_ref_gr1, clustering_emb_cut),
+    NMI_onself = aricode::NMI(clustering_ref_gr1, clustering_emb_cut)
   )
 }
 
@@ -220,6 +233,7 @@ ref_embedding <- ref_embedding / scale_factor + rm
 
 res1 <- calculate_metrics(ref_embedding, ref_embedding, ref_is_gr1, ref_is_gr1)
 res1 <- c(res1, structure_conservation(assay(sce, config$assay_continuous), ref_embedding, ref_is_gr1))
+res1 <- c(res1, structure_conservation2(noint_embedding, ref_embedding, ref_is_gr1))
 res1 <- c(res1, overlap_score(ref_embedding, noint_embedding, ref_is_gr1))
 res1 <- c(res1, signal_to_noise_ratio(ref_embedding, ref_is_gr1, ref_celltypes))
 res1$comparison <- "train_vs_train"
@@ -235,6 +249,7 @@ res <- if(file.exists(holdout_file)){
   celltypes <- colData(holdout)[[config$cell_type_column]]
   res2 <- calculate_metrics(embedding, ref_embedding, is_gr1, ref_is_gr1)  
   res2 <- c(res2, structure_conservation(assay(holdout, config$assay_continuous), embedding, is_gr1))
+  res2 <- c(res2, structure_conservation2(noint_holdout_embedding, embedding, is_gr1))
   res2 <- c(res2, overlap_score(embedding, noint_holdout_embedding, is_gr1))
   res2 <- c(res2, signal_to_noise_ratio(embedding, is_gr1, celltypes))
   
