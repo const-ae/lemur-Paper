@@ -105,14 +105,14 @@ pl1 <- tibble(celltype = celltype_assign, condition = cond_assign,
        Y = t(Y), Y_ctrl = t(Y_pred_ctrl), Y_trt = t(Y_pred_trt)) %>%
   ggplot() +
     annotate_subspace(origin = rowMeans(Y), dir = fit$base_point, color = "#898989", lwd = 0.5) +
-    annotate_labels_along(origin = rowMeans(Y), dir = fit$base_point, labels = "$o$: base subspace", at = 4, 
+    annotate_labels_along(origin = rowMeans(Y), dir = fit$base_point, labels = "$o$: base space", at = 4, 
                           offset = 0.15, size = font_size_small/.pt, color = "#898989") +
     annotate_subspace(origin = fit$linear_coefficients[,1], dir = ctrl_space, color = "black", lwd = 0.6) +
     annotate_labels_along(origin = fit$linear_coefficients[,1], dir = ctrl_space, labels = "$R(\\textrm{control})$", at = 4, 
                           hjust = 0, offset = -0.2, size = font_size_small/.pt, color = "#898989") +
     annotate_subspace(origin = fit$linear_coefficients[,2], dir = trt_space, color = "black", lwd = 0.6) +
     annotate_labels_along(origin = fit$linear_coefficients[,2], dir = trt_space, labels = "$R(\\textrm{treated})$", at = 4, 
-                          hjust = 0, offset = 0.15, size = font_size_small/.pt, color = "#898989") +
+                          hjust = 0, offset = 0.2, size = font_size_small/.pt, color = "#898989") +
     annotate_ticks(fit$linear_coefficients[,1] - ctrl_space %*% offset_ctrl, dir = ctrl_space * scale_ctrl, at = -5:4) +
     annotate_ticks(fit$linear_coefficients[,2] - trt_space %*% offset_trt, dir = trt_space * scale_trt, at = -5:5) +
     annotate_labels_along(fit$linear_coefficients[,1] - ctrl_space %*% offset_ctrl, dir = ctrl_space * scale_ctrl, at = -5:4, labels = -5:4, offset = 0.2, size = font_size_tiny / .pt) +
@@ -124,9 +124,10 @@ pl1 <- tibble(celltype = celltype_assign, condition = cond_assign,
     annotate_point(fit$linear_coefficients[,1]) +
     annotate_point(fit$linear_coefficients[,2]) +
     geom_point(aes(x = Y[,1], y = Y[,2], color = condition), size = 0.5) +
-    labs(x = "Gene 1", y = "Gene 2") +
+    scale_color_manual(values = c("control" = "#FC8D62", "treated" = "#8DA0CB")) +
+    labs(x = "Gene 1", y = "Gene 2", color = "") +
     coord_fixed(xlim = c(-3, 6), ylim = c(-0.5, 6), clip = "off") +
-    theme(legend.position = "bottom") 
+    theme(legend.position = c(0.6, 0.05), legend.direction = "horizontal") 
 
 pl1
 ```
@@ -140,15 +141,18 @@ pl2 <- tibble(celltype = celltype_assign, condition = cond_assign,emb = fit$embe
   unpack(diff, names_sep = "-") %>%
   pivot_longer(starts_with("diff"), names_sep = "-", names_to = c(".value", "Gene")) %>%
   ggplot(aes(x = emb, y = diff)) +
-    geom_segment(aes(xend = emb, yend = 0, color = condition), lwd = 0.2, show.legend = FALSE) +
+    geom_segment(aes(xend = emb, yend = 0, color = condition), lwd = 0.1, show.legend = FALSE) +
     geom_segment(data = true_de, aes(x = emb - 0.4, xend = emb + 0.4, y = de, yend = de), lwd = 0.8, color = "black", linetype = "solid") +
     annotate_subspace() +
     annotate_ticks(length = 0.3) +
     annotate_labels_along(at = -5:5, labels = -5:5, offset = 0.4, size = font_size_tiny / .pt) +
-    facet_wrap(vars(Gene), ncol = 1) +
-    lims(x = c(-5, 5)) +
+    scale_color_manual(values = c("control" = "#FC8D62", "treated" = "#8DA0CB")) +
+    scale_x_continuous(expand = expansion(add = 0)) +
+    facet_wrap(vars(Gene), nrow = 1, scales = "free_y") +
+    lims(x = c(-4.5, 4.2), y = c(-2,4)) +
     labs(x = "Embedding Position ($Z$)", y = "$\\Delta$ (Treated - Control)") +
-    theme(axis.ticks.x = element_blank(), axis.text.x = element_blank(), axis.line.x = element_blank())
+    theme(axis.ticks.x = element_blank(), axis.text.x = element_blank(), axis.line.x = element_blank(),
+          panel.spacing.x = unit(3, "mm"))
 
 pl2
 ```
@@ -156,10 +160,13 @@ pl2
 
 ```{r}
 plot_assemble(
-  add_plot(pl1 + labs(title = "(A) LEMUR fit on simulated data with two genes"), x = 0, y = 1, width = 90, height = 80),
-  add_plot(pl2 + labs(title = "(B) Predicted differential expression"), x = 100, y = 2, width = 80, height = 72),
-  width = 170, height = 80, units = "mm", show_grid_lines = FALSE,
-  latex_support = TRUE, filename = "../plots/suppl_simulated_data.pdf"
+  add_text("(A)", x = 0.5, y = 0.5, vjust = 1, fontsize = font_size, fontface = "bold"),
+  add_graphic("../illustrations/cell_type_kidneys.pdf", x = 10, y = 5, width = 53, height = 32, units = "mm"),
+  add_plot(pl1, x = 2, y = 0, width = 65, height = 50),
+  add_text("(B)", x = 1.5, y = 48, vjust = 1, fontsize = font_size, fontface = "bold"),
+  add_plot(pl2, x = 1, y = 50, width = 68, height = 25),
+  width = 70, height = 75, units = "mm", show_grid_lines = FALSE,
+  latex_support = TRUE, filename = "../plots/simulated_data.pdf"
 )
 ```
 
