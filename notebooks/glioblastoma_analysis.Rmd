@@ -170,8 +170,8 @@ z_base_space <- as_tibble(colData(fit_small)) %>%
   ggplot(aes(x = emb[,1], y = emb[,2])) +
     ggrastr::rasterize(geom_point(aes(color = cell_type), size = 0.07, stroke = 0, show.legend = FALSE), dpi = 600) +
     scale_color_manual(values = cell_type_colors) +
-    small_axis(label = "$Z$ space", xlim = c(-18, 40), ylim = c(-20, 25)) +
-    labs(subtitle = "LEMUR's latent space ($Z$)\ncolored by cell type")
+    small_axis(label = "$\\matr{Z}$ space", xlim = c(-18, 40), ylim = c(-20, 25)) +
+    labs(subtitle = "LEMUR's latent space ($\\matr{Z}$)\ncolored by cell type")
 
 
 mc_biplot_marker <- as_tibble(colData(fit_small)) %>%
@@ -185,8 +185,8 @@ mc_biplot_marker <- as_tibble(colData(fit_small)) %>%
     scale_color_manual(values = condition_colors) +
     geom_text(data = manual_text_pos %>% filter(is_marker_gene[gene]), aes(x = V1, y = V2, hjust = hjust, vjust = vjust, label = gene_label), size = font_size_small / .pt) +
     # coord_fixed(ylim = c(-20, 25), xlim = c(-40, 20), clip = "off") +
-    small_axis(label = "$Z$ space", xlim = c(-18, 40), ylim = c(-20, 25)) +
-    labs(subtitle = "Marker genes projected on $Z$")
+    small_axis(label = "$\\matr{Z}$ space", xlim = c(-18, 40), ylim = c(-20, 25)) +
+    labs(subtitle = "Marker genes projected on $\\matr{Z}$")
     
 mc_biplot_diff <- as_tibble(colData(fit_small)) %>%
   mutate(emb = t(fit_small$embedding[1:2,])) %>%
@@ -200,8 +200,8 @@ mc_biplot_diff <- as_tibble(colData(fit_small)) %>%
     scale_color_manual(values = condition_colors) +
     geom_text(data = manual_text_pos %>% filter(!is_marker_gene[gene]), aes(x = V1, y = V2, hjust = hjust, vjust = vjust, label = gene_label), size = font_size_small / .pt) +
     # coord_fixed(ylim = c(-20, 25), xlim = c(-40, 20), clip = "off") +
-    small_axis(label = "$Z$ space", xlim = c(-18, 40), ylim = c(-25, 20)) +
-    labs(subtitle = "Gene with large expression change projected on $Z$")
+    small_axis(label = "$\\matr{Z}$ space", xlim = c(-18, 40), ylim = c(-25, 20)) +
+    labs(subtitle = "Gene with large expression change projected on $\\matr{Z}$")
 
 mc_biplot_marker
 mc_biplot_diff
@@ -777,9 +777,9 @@ plot_assemble(
   
   add_text("(B) Alignment with LEMUR adjusting for patient and treatment effect", x = 1.5, y = 24.5, vjust = 1, fontsize = font_size, fontface = "bold"),
   add_plot(cowplot::get_legend(condition_legend), x = 3, y = 31 , height = 34),
-  add_text("UMAP of $Y$", x = 25 + row1_umap_width * 0.5, y = 30, vjust = 1, hjust = 0.5, fontsize = 7),
-  add_text("UMAP of $Z$ if $S = I$", x = 25 + row1_umap_width * 1.5, y = 30, vjust = 1, hjust = 0.5, fontsize = 7),
-  add_text("UMAP of $Z$ if $S$ estimated with Harmony", x = 25 + row1_umap_width * 2.5, y = 30, vjust = 1, hjust = 0.5, fontsize = 7),
+  add_text("UMAP of $\\matr{Y}$", x = 25 + row1_umap_width * 0.5, y = 30, vjust = 1, hjust = 0.5, fontsize = 7),
+  add_text("UMAP of $\\matr{Z}$ if $\\matr{S} = I$", x = 25 + row1_umap_width * 1.5, y = 30, vjust = 1, hjust = 0.5, fontsize = 7),
+  add_text("UMAP of $\\matr{Z}$ if $\\matr{S}$ estimated with Harmony", x = 25 + row1_umap_width * 2.5, y = 30, vjust = 1, hjust = 0.5, fontsize = 7),
   add_plot(umap_orig_pc_pl, x = 25 + row1_umap_width * 0, y = 31, width = row1_umap_width, height = 40),
   add_plot(umap_fit_pc_pl, x = 25 + row1_umap_width * 1, y = 31, width = row1_umap_width, height = 40),
   add_plot(umap_fital_pc_pl, x = 25 + row1_umap_width * 2, y = 31, width = row1_umap_width, height = 40),

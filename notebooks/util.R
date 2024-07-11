@@ -15,6 +15,26 @@ publ_theme <- cowplot::theme_cowplot(font_size = font_size, rel_small = font_siz
         strip.text = element_text(size = font_size_small))
 theme_set(publ_theme)
 
+tikzDevice::setTikzDefaults()
+options(tikzDocumentDeclaration = union(
+  getOption("tikzDocumentDeclaration"),
+  c(
+    r"(\renewcommand{\familydefault}{\sfdefault})", 
+    r"(\usepackage{helvet})",   # Use sans serif font Helvetica
+    r"(\newcommand{\matr}[1]{\mathbf{#1}})"
+  ))
+)
+options(tikzLatexPackages = union(
+  getOption("tikzLatexPackages"),
+  c(
+    "\\usepackage{amssymb}",
+    "\\usepackage{amsmath}", 
+    "\\usepackage{bm}"
+  ))
+)
+
+
+
 small_axis <- function(label = NULL, fontsize = 7, arrow_length = 10, label_offset = 1, fix_coord = TRUE, remove_axes = TRUE,
                        arrow_spec = grid::arrow(ends = "both", type = "closed", angle = 20, length = unit(arrow_length / 7, units)),
                        units = "mm", ...){
@@ -113,8 +133,7 @@ my_pdf <- function(filename, width, height, units = c("inches", "in", "cm", "mm"
 my_tikz <- function(filename, width, height, units = c("inches", "in", "cm", "mm", "px"), dpi = 300, scale = 1, stand_alone = TRUE, ...){
   dim <- convert_dims(width, height, units, dpi, scale)
   tikzDevice::tikz(filename, width = dim[1], height = dim[2], standAlone = stand_alone, 
-                   documentDeclaration = c(getOption("tikzDocumentDeclaration"), r"(\renewcommand{\familydefault}{\sfdefault})", r"(\usepackage{helvet})"),  # Use sans serif font Helvetica
-                   packages = c(options("tikzLatexPackages")$tikzLatexPackages, "\\usepackage{amssymb}", "\\usepackage{amsmath}", "\\usepackage{bm}"),  ...)
+                   documentDeclaration = getOption("tikzDocumentDeclaration"), packages = getOption("tikzLatexPackages"), ..., verbose = TRUE)
 }
 
 save_plot <- function(filename, plot = ggplot2::last_plot(), width = 6.2328, height = 3.71, units = c("inches", "cm", "mm", "px"), dpi = 300, scale = 1, latex_support = FALSE, ...){

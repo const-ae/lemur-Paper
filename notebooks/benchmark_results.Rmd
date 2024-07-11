@@ -244,7 +244,7 @@ kang_plot <- kang_vis %>%
     guides(color = guide_legend(override.aes = list(size = 2))) +
     small_axis(label = "UMAP", fontsize = font_size_small) +
     labs(color = "Cell condition",
-         title = "(A) Latent space ($Z$) of Lupus patient samples treated with IFN-$\\beta$ (Kang)") +
+         title = "(A) Latent space ($\\matr{Z}$) of Lupus patient samples treated with IFN-$\\beta$ (Kang)") +
     theme(legend.position = "bottom")
 
 kang_plot
@@ -259,7 +259,7 @@ kang_plot_cell_type <- kang_vis %>%
     ggrastr::rasterize(geom_point(aes(color = celltype), size = 0.05, stroke = 0), dpi = 600) +
     guides(color = "none") +
     small_axis(label = "UMAP", fontsize = font_size_small) +
-    labs(title = "(C) $Z$ colored by\ncell type")
+    labs(title = "(C) $\\matr{Z}$ colored by\ncell type")
 
 kang_plot_cell_type
 ```
@@ -618,7 +618,7 @@ de_power_fdr_with_label <- de_power_fdr %>%
     str_starts(es, "testfrac_") ~ glue("$\\text{{test fraction}} = {as.numeric(str_remove(es, 'testfrac_')) * 100}\\%$"),
     es == "sel_contrast" ~ "contrast selection",
     es == "dir_contrast" ~ "contrast directions",
-    es == "skip_al" ~ "$S=I$ (rigid)",
+    es == "skip_al" ~ "$\\matr{S}=I$ (rigid)",
     es == "skip_multCondPCA" ~ "parametric Harmony",
     es == "sf_method_ratio" ~ "ratio size factor",
     es == "count_split" ~ "count splitting",
