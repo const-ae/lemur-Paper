@@ -1,7 +1,7 @@
 #!/bin/sh
 
 #SBATCH --nodes=1 
-#SBATCH --time=03:00:00
+#SBATCH --time=04:00:00
 #SBATCH --mem=120GB
 #SBATCH --job-name=render_prepare_alzheimer_plaques
 #SBATCH --output=tmp/slurm_logs/log-%x.%j.out

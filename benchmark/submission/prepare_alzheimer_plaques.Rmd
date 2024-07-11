@@ -80,6 +80,31 @@ rowData(sce) <- data.frame(symbol = rownames(sce)) %>%
   tidylog::left_join(dplyr::rename(eg, symbol = SYMBOL, gene_id = ENSEMBL)) 
 ```
 
+```{r}
+cont2ordered <- function(x, n, from = min(x), to = max(x), add_label = TRUE, label_fmt = "%.2f"){
+  groups <- seq(from, to, length.out = n+1)
+  res <- rep(NA_integer_, length(x))
+  labels <- rep(NA_character_, n)
+  for(idx in seq_len(n)){
+    if(idx == n){
+      labels[idx] <- paste0("[", sprintf(label_fmt, groups[idx]), ",", sprintf(label_fmt, groups[idx+1]), "]")
+      res[x >= groups[idx] & x <= groups[idx+1]] <- idx
+    }else{
+      labels[idx] <- paste0("[", sprintf(label_fmt, groups[idx]), ",", sprintf(label_fmt, groups[idx+1]), ")")
+      res[x >= groups[idx] & x < groups[idx+1]] <- idx
+    }
+  }
+  if(add_label){
+    ordered(res, levels = seq_len(n), labels = labels)
+  }else{
+    res
+  }
+}
+
+cont2ordered(seq(0, 30), n = 6, label_fmt = "%.f")
+levels(cont2ordered(sce$plaque_density, n = 10, label_fmt = "%.2f"))
+
+```
 
 
 
@@ -108,11 +133,126 @@ length(setdiff(rownames(sce), rownames(brain_ref)))
 # str(setdiff(rownames(sce), rownames(brain_ref)))
 
 pred <- SingleR::SingleR(sce, ref = hippocampus_ref, labels = hippocampus_ref$class)
-sce$cell_type <- pred$labels
-sce$cell_type_lumped <- fct_lump(sce$cell_type, n = 5)
+sce$CELL_TYPE <- pred$labels
+sce$CELL_TYPE_LUMPED <- fct_lump(sce$CELL_TYPE, n = 5)
 
 SingleR::plotScoreHeatmap(pred)
 ```
+
+# Fine map the Hippocampus cell types
+
+Download files
+
+```{r}
+yao_file <- "../data/cable_spatial_plaque_data/yao_isocortex_and_hippocampus_atlas.h5ad"
+if(! file.exists(yao_file)){
+  options(timeout = 3000)
+  yao_dataset_url <- "https://datasets.cellxgene.cziscience.com/efbc53b2-559e-42cb-804d-f67443034cde.h5ad"
+  download.file(yao_dataset_url, yao_file)
+}
+```
+
+Subset the file (unfortunately, this has to happen in python)
+
+```{r}
+yao_sub_file <- "../data/cable_spatial_plaque_data/yao_hippocampus_atlas.h5ad"
+if(! file.exists(yao_sub_file)){
+  Sys.setenv(RETICULATE_PYTHON = "/g/huber/users/ahlmanne/conda-envs/pylemur_env/bin/python")
+  Sys.setenv(PYTHONPATH = "/g/huber/users/ahlmanne/conda-envs/pylemur_env/bin/python")
+  reticulate::use_condaenv("pylemur_env", required = TRUE)
+  ad <- reticulate::import("anndata")
+  adata <- ad$read_h5ad(yao_file)
+  sub_adata <- adata[adata$obs["tissue"] == "hippocampal formation",]
+  sub_adata$write_h5ad(yao_sub_file)
+}
+
+hippo_ref <- zellkonverter::readH5AD(yao_sub_file)
+counts(hippo_ref) <- assay(hippo_ref, "X")
+assay(hippo_ref, "X") <- NULL
+logcounts(hippo_ref) <- transformGamPoi::shifted_log_transform(counts(hippo_ref))
+
+match_rownames <- as_tibble(rowData(hippo_ref), rownames = "gene_id") %>%
+  tidylog::left_join(as_tibble(rowData(sce)), by = "gene_id") %>%
+  drop_na(symbol) %>%
+  group_by(symbol) %>%
+  summarize(gene_id = first(gene_id)) %>%
+  dplyr::select(gene_id, symbol) %>%
+  deframe()
+
+
+length(setdiff(names(match_rownames), rownames(hippo_ref)))
+hippo_ref <- hippo_ref[rownames(hippo_ref) %in% names(match_rownames), ]
+rownames(hippo_ref) <- match_rownames[rownames(hippo_ref)]
+```
+
+```{r}
+convert_interval_to_number <- function(interval){
+  str_mat <- str_match(interval, ".(\\d+\\.?\\d*),(\\d+\\.?\\d*)")[,2:3]
+  num_mat <- array(as.numeric(str_mat), dim = dim(str_mat))
+  rowMeans(num_mat)
+}
+
+hvg_a <- order(-rowVars(logcounts(hippo_ref)))
+
+a_sce <- hippo_ref[hvg_a[1:500], ]
+b_sce <- sce[rownames(a_sce),]
+b_sce$plaque_cluster <- cont2ordered(b_sce$plaque_density, n = 10, label_fmt = "%.2f")
+b_sce$plaque_cluster_cont <- convert_interval_to_number(b_sce$plaque_cluster)
+logcounts(a_sce) <- NULL
+logcounts(b_sce) <- NULL
+colData(a_sce) <- DataFrame(cell_id = colnames(a_sce),
+                            origin = rep("ref", times = ncol(a_sce)), 
+                            cell_type = colData(hippo_ref)$cell_type,
+                            subclass = colData(hippo_ref)$subclass_label,
+                            class = colData(hippo_ref)$class_label,
+                            plaque_cluster_cont = 0)
+colData(b_sce) <- DataFrame(cell_id = colnames(b_sce),
+                            origin = rep("sce", times = ncol(b_sce)), 
+                            cell_type = rep(NA, times  = ncol(b_sce)),
+                            subclass = rep(NA, times  = ncol(b_sce)),
+                            class = rep(NA, times  = ncol(b_sce)),
+                            plaque_cluster_cont = b_sce$plaque_cluster_cont)
+rowData(a_sce) <- NULL
+rowData(b_sce) <- NULL
+reducedDims(a_sce) <- NULL
+reducedDims(b_sce) <- NULL
+joint_sce <- cbind(a_sce, b_sce)
+logcounts(joint_sce) <- transformGamPoi::shifted_log_transform(joint_sce)
+
+set.seed(1)
+integration_fit <- lemur::lemur(joint_sce, design = ~ origin + plaque_cluster_cont, n_embedding = 30, test_fraction = 0, verbose = TRUE)
+integration_fit <- lemur::align_harmony(integration_fit)
+
+new_df <- lemur.utils::transfer_col_data(integration_fit[,integration_fit$colData$origin == "ref"],
+                               integration_fit[,integration_fit$colData$origin == "sce"], 
+                               columns = vars(cell_type, subclass, class), k = 20) %>%
+  mutate(cell_id = integration_fit$colData$cell_id[integration_fit$colData$origin == "sce"])
+
+colData(sce) <- colData(sce) %>%
+  as_tibble(rownames = "cell_id") %>%
+  left_join(new_df, by = "cell_id") %>%
+  DataFrame()
+  
+```
+
+```{r}
+table(sce$CELL_TYPE, sce$cell_type)
+```
+
+
+```{r}
+int_umap <- uwot::umap(t(integration_fit$embedding))
+as_tibble(colData(integration_fit)) %>%
+  mutate(cell_type = fct_lump(cell_type,  n = 6)) %>%
+  mutate(subclass = fct_lump(subclass,  n = 6)) %>%
+  mutate(umap = int_umap) %>%
+  sample_frac(n = 1) %>%
+  ggplot(aes(x = umap[,1], y = umap[,2])) +
+    geom_point(aes(color = subclass), size = 0.01) +
+    facet_wrap(vars(origin)) +
+    guides(color = guide_legend(override.aes = list(size = 2)))
+```
+
 
 
 
@@ -140,38 +280,11 @@ reducedDim(sce_subset, withDimnames = FALSE) <- umap
 ```
 
 
-
-
-```{r}
-cont2ordered <- function(x, n, from = min(x), to = max(x), add_label = TRUE, label_fmt = "%.2f"){
-  groups <- seq(from, to, length.out = n+1)
-  res <- rep(NA_integer_, length(x))
-  labels <- rep(NA_character_, n)
-  for(idx in seq_len(n)){
-    if(idx == n){
-      labels[idx] <- paste0("[", sprintf(label_fmt, groups[idx]), ",", sprintf(label_fmt, groups[idx+1]), "]")
-      res[x >= groups[idx] & x <= groups[idx+1]] <- idx
-    }else{
-      labels[idx] <- paste0("[", sprintf(label_fmt, groups[idx]), ",", sprintf(label_fmt, groups[idx+1]), ")")
-      res[x >= groups[idx] & x < groups[idx+1]] <- idx
-    }
-  }
-  if(add_label){
-    ordered(res, levels = seq_len(n), labels = labels)
-  }else{
-    res
-  }
-}
-
-cont2ordered(seq(0, 30), n = 6, label_fmt = "%.f")
-levels(cont2ordered(sce_subset$plaque_density, n = 10, label_fmt = "%.2f"))
-```
-
-
-
 ```{r}
 sce_subset$plaque_cluster <- cont2ordered(sce_subset$plaque_density, n = 10, label_fmt = "%.2f")
 ```
+
+
 
 
 ```{r}
@@ -184,7 +297,7 @@ as_tibble(colData(sce_subset)) %>%
 as_tibble(colData(sce_subset)) %>%
   mutate(umap = umap) %>%
   ggplot(aes(x = umap[,1], y = umap[,2])) +
-    geom_point(aes(color = cell_type_lumped), size = 0.3, stroke = 0) +
+    geom_point(aes(color = CELL_TYPE_LUMPED), size = 0.3, stroke = 0) +
     guides(color = guide_legend(override.aes = list(size = 1)))
 
 as_tibble(colData(sce_subset)) %>%
