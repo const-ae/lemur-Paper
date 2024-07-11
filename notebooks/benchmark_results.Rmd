@@ -35,7 +35,9 @@ method_labels <-  c("PCA" = "PCA", "harmony" = "Harmony", "invertible_harmony" =
 
 ```{r, paged.print = FALSE}
 int_data <- read_tsv(glue("../benchmark/output/integration_results-{variation}.tsv")) %>%
-  mutate(method = ifelse(method == "CPA_kangparams", "CPA", method))
+  mutate(method = ifelse(method == "CPA_kangparams", "CPA", method)) %>%
+  dplyr::select(-ends_with("_onlog")) %>%
+  dplyr::rename_with(\(x) str_remove(x, "_onself"), ends_with("_onself"))
 int_data
 ```
 
@@ -188,7 +190,16 @@ int_bio_df <- left_join(int_data %>%  dplyr::select(data, method, comparison, mi
   mutate(avg_mix = mean(mix),
          avg_ARI = mean(ARI), .by = c(data)) 
   
-set.seed(1)
+
+int_bio_label_loc_df <- tibble::tribble(
+    ~x,   ~y, ~hjust,    ~label,
+  0.40, 1.25,      1,     "PCA",
+  0.96, 1.08,      1,   "LEMUR",
+  1.20, 0.98,      0, "Harmony",
+  0.92, 0.75,      1,    "scVI",
+  1.30, 0.62,      0,     "CPA"
+)
+
 int_bio_pl <- int_bio_df %>%
   mutate(method = as.character(method)) %>%
   reframe(bootstrap_samples = bootstrap(cbind(mix / avg_mix, ARI / avg_ARI), \(mat) matrix(colMeans(mat), nrow = 1), n_iterations = 1000),
@@ -198,18 +209,18 @@ int_bio_pl <- int_bio_df %>%
   ggplot(aes(x = value[,1], y = value[,2])) +
     geom_density2d(aes(color = method), adjust = 3, contour_var = "ndensity", breaks = seq(0.9, 0.2, length.out = 3)) +
     geom_point(data = int_bio_df, aes(x =  mix / avg_mix, y = ARI / avg_ARI, color = stage(method, after_scale = colorspace::lighten(colour, 0.3))), alpha = 0.3, size = 0.1) +
-    ggrepel::geom_text_repel(data = . %>% summarize(value = matrix(colMeans(value), nrow = 1), .by = method), aes(label = method_labels[method]), 
-                             size = font_size_small / .pt, point.padding = unit(3, "mm") ) +
+    # ggrepel::geom_text_repel(data = . %>% summarize(value = matrix(colMeans(value, na.rm=TRUE), nrow = 1), .by = method), aes(label = method_labels[method]), 
+    #                          size = font_size_small / .pt, point.padding = unit(3, "mm") ) +
+    geom_text(data = int_bio_label_loc_df, aes(x = x, y = y, hjust = hjust, label = label), size = font_size_small / .pt) +
     annotation_custom(grid::polylineGrob(x = c(0.91, 0.99), y = c(0.91, 0.99), gp = grid::gpar(fill = "black"), arrow =  grid::arrow(ends = "last", type = "closed", angle = 20, length = unit(10 / 7, "mm")))) +
     labs(y = "Biological signal retention\nARI normalized per dataset",x = "Integration of conditions\n$k$-NN mixing normalized per dataset") +
-    scale_x_continuous(limits = c(0, 1.7), breaks = c(0, 1, 2), expand = expansion(add = c(0, 0.05))) +
-    scale_y_continuous(limits = c(0, 1.3), breaks = c(0, 1), expand = expansion(add = c(0, 0.05))) +
+    scale_x_continuous(breaks = c(0, 1, 2), expand = expansion(add = c(0, 0.05))) +
+    scale_y_continuous(breaks = c(0, 1), expand = expansion(add = c(0, 0.05))) +
     guides(color = "none") +
-    coord_fixed() 
+    coord_fixed(xlim = c(0, 1.7), ylim = c(0, 1.3)) 
 
 int_bio_pl
 ```
-
 
 
 ```{r, paged.print = FALSE}
@@ -305,6 +316,11 @@ full_data_rel <- pred_data_long %>%
   mutate(metric = factor(metric, levels = pred_metrics)) %>%
   mutate(is_perf = ifelse(str_starts(comparison, "holdout"), "holdout", "training")) 
 
+full_data_rel %>%
+  filter(metric == "l2_mean") %>%
+  summarize(mean_value = mean(value), min = min(value), max = max(value), .by = data) %>%
+  summarise(across(everything(), list(min=min, max=max), .names = "{.col}-{.fn}"))
+
 pl1 <- full_data_rel %>%
   filter(metric %in% norm_metric) %>%
   mutate(rel_perf = ifelse(rel_perf > 2.5, Inf, rel_perf)) %>%
@@ -313,7 +329,8 @@ pl1 <- full_data_rel %>%
     # geom_point(data = . %>% filter(is.infinite(rel_perf)), size = 0.2) +  # filtering breaks the x-axis order thus hack alpha
     geom_point(aes(alpha = is.infinite(rel_perf) * 1.0), size = 0.2, show.legend = FALSE) +
     ggbeeswarm::geom_quasirandom(size = 0.2) +
-    geom_pointrange(data = full_data_rel %>% filter(metric %in% norm_metric) %>% summarize(rel_perf = mean_se(rel_perf), .by = c(method, metric)),
+    geom_pointrange(data = full_data_rel %>% filter(metric %in% norm_metric) %>% 
+                      summarize(rel_perf = mean_se(rel_perf), .by = c(method, metric)),
                     aes(y = rel_perf$y, ymin = rel_perf$ymin, ymax = rel_perf$ymax), color = "red", fatten = 1, size = 1) +
     facet_grid(vars(is_perf), vars(metric), labeller = labeller(metric = as_labeller(pred_metrics_labels))) +
     scale_x_discrete(labels = pred_method_labels, breaks = pred_methods) +
@@ -322,8 +339,10 @@ pl1 <- full_data_rel %>%
     coord_cartesian(clip = "off") +
     guides(x = guide_axis(angle = 90)) +
     theme(axis.title.x = element_blank(), plot.title.position = "plot", 
-          panel.spacing.y = unit(5, "mm")) +
-    labs(title = "Distances and correlation measures between predicted and observed expression", y = "distance (normalized per dataset)")
+          panel.spacing.y = unit(5, "mm"), panel.spacing.x = unit(3, "mm")) +
+    labs(title = "Distance and correlation measures between predicted and observed expression",
+         subtitle = "There are two points per dataset (A vs B and B vs A)",
+         y = "distance (normalized per dataset)")
 
 pl2 <- full_data_rel %>%
   filter(str_starts(metric, "r2")) %>%
@@ -332,7 +351,8 @@ pl2 <- full_data_rel %>%
     # geom_point(data = . %>% filter(is.infinite(rel_perf)), size = 0.2) +  # filtering breaks the x-axis order thus hack alpha
     geom_point(aes(alpha = is.infinite(rel_perf) * 1.0), size = 0.2, show.legend = FALSE) +
     ggbeeswarm::geom_quasirandom(size = 0.2) +
-    geom_pointrange(data = full_data_rel %>% filter(str_starts(metric, "r2")) %>% summarize(value = mean_se(value), .by = c(method, metric)),
+    geom_pointrange(data = full_data_rel %>% filter(str_starts(metric, "r2")) %>%
+                      summarize(value = mean_se(value), .by = c(method, metric)),
                     aes(y = value$y, ymin = value$ymin, ymax = value$ymax), color = "red", fatten = 1, size = 1) +
     facet_grid(vars(is_perf), vars(metric), scales = "free_y", labeller = labeller(metric = as_labeller(pred_metrics_labels))) +
     scale_x_discrete(labels = pred_method_labels) +
@@ -340,7 +360,8 @@ pl2 <- full_data_rel %>%
     coord_cartesian(clip = "off") +
     guides(x = guide_axis(angle = 90)) +
     theme(axis.title.x = element_blank(), plot.title.position = "plot",
-          strip.text.y.right =  element_blank(), panel.spacing.y = unit(5, "mm")) +
+          strip.text.y.right =  element_blank(), 
+          panel.spacing.y = unit(5, "mm"), , panel.spacing.x = unit(3, "mm")) +
     labs(title = "", y = "correlation")
 
 pl3 <- full_data_rel %>%
@@ -358,10 +379,10 @@ pl3 <- full_data_rel %>%
     labs(title = " ")
 
 plot_assemble(
-  add_plot(pl1, x = 0, y = 0, width = 164, height = 60),
-  add_plot(pl2 , x = 0, y = 60, width = 131, height = 60),
-  add_plot(pl3, x = 131, y = 60, width = 37, height = 60),
-  width = 170, height = 120, units = "mm", show_grid_lines = FALSE,
+  add_plot(pl1, x = 0, y = 0, width = 164, height = 70),
+  add_plot(pl2 , x = 0, y = 70, width = 131, height = 60),
+  add_plot(pl3, x = 131, y = 70, width = 37, height = 60),
+  width = 170, height = 130, units = "mm", show_grid_lines = FALSE,
   latex_support = TRUE, filename = "../plots/suppl_prediction_all_metrics.pdf"
 )
 
@@ -385,12 +406,12 @@ perf_pred_plot <- pred_data_long %>%
     ggbeeswarm::geom_quasirandom(color = "grey", width = 0.2, size = 0.5) +
     stat_summary(geom = "pointrange", fun.data = mean_se, color = "red", size = 0.4) +
     small_arrow(position = c(0.1, 0.01), offset = 0.03) +
-    facet_wrap(vars(metric), labeller = as_labeller(c("l2_mean_per_celltype" = "Error per cell type\n(Mean $L_2$ distance)"))) +
+    facet_wrap(vars(metric), labeller = as_labeller(c("l2_mean_per_celltype" = "Prediction error for 13 datasets"))) +
     scale_x_continuous(expand = expansion(mult = c(0, 0.1)), breaks = c(0, 1, 2)) +
     scale_y_discrete(labels = c("lemur" = "LEMUR", "CPA" = "CPA", "no_change" = "Identity")) +
     coord_cartesian(xlim = c(0, 2)) +
     theme(axis.title.y = element_blank(), plot.title.position = "plot") +
-    labs(title = "(E) Prediction performance", x = "Relative performance across 13 datasets")
+    labs(title = "(D) Prediction performance", x = "Mean $L_2 = ||\\textrm{pred} - \\textrm{obs}||_2$ per cell type")
 
 perf_pred_plot
 ```
@@ -427,7 +448,7 @@ ct_scatter_plot <- tidylog::inner_join(filter(kang_pred, method != "obs"),
     guides(color = guide_legend(override.aes = list(size = 2))) +
     coord_fixed() +
     labs(color = "",
-         title = "(D) Predicted vs. observed gene expression per cell type",
+         title = "(C) Predicted vs. observed gene expression per gene and cell type",
          x = "Observed expression", y = "Predicted expression") +
     theme(legend.position = "bottom", plot.title.position =  "plot")
 
@@ -540,11 +561,11 @@ prec_recall_plot <- prec_recall_df %>%
     scale_x_continuous(expand = expansion(0), breaks = c(0, 0.25, 0.5, 0.75, 1), labels = c("0", "0.25", "0.5", "0.75", "1")) +
     scale_y_continuous(expand = expansion(0), breaks = c(0, 0.5, 1), labels = c("0", "0.5", "1")) +
     scale_color_manual(values = c("special" = "red", "signif" = "black", "not signif" = "lightgrey"), 
-                       labels = c("special" = "Example\nfrom F,G", "signif" = "signif. genes", "not signif" = "not signif. genes")) +
+                       labels = c("special" = "Example\nfrom E,F", "signif" = "signif. genes", "not signif" = "not signif. genes")) +
     scale_size_manual(values = c("special" = 0.7, "signif" = 0.4, "not signif" = 0.1)) +
     guides(color = guide_legend(override.aes = list(alpha = 1, size = 1.5)), size = "none") +
     coord_cartesian(clip = "off") +
-    labs(title = "(H) Neighborhood \\& ground truth overlap",
+    labs(title = "(G) Neigh. comparison with ground truth",
          subtitle = paste0("Precision: fraction of neighborhood inside ground truth\n",
                            "Recall: fraction of ground truth inside neighborhood"), 
          color = "", x = "Recall", y = "Precision") +
@@ -578,7 +599,7 @@ fdr_control_plot <- de_power_fdr %>%
     coord_fixed(ylim = c(0, 0.3), xlim = c(0, 0.2)) +
     scale_x_continuous(expand = expansion(0), breaks = c(0, 0.1, 0.2), labels = c("0", "0.1", "0.2")) +
     scale_y_continuous(expand = expansion(0)) +
-    labs(title = "(I) FDR control", 
+    labs(title = "(H) FDR control", 
          x = "Nominal FDR", y = "Observed FDR",
          subtitle = "Eleven datasets (\\textcolor{blue!70!black}{mean})") +
     theme(plot.title.position = "plot")
@@ -600,7 +621,7 @@ power_plot <- de_power_fdr %>%
     coord_cartesian(ylim = c(0, 0.75), xlim = c(0, 0.2)) +
     scale_x_continuous(expand = expansion(add = c(0, 0.02)), breaks = c(0, 0.1, 0.2), labels = c("0", "0.1", "0.2")) +
     scale_y_continuous(expand = expansion(0)) +
-    labs(title = "(J) DE-test Power", 
+    labs(title = "(I) DE-test Power", 
          x = "Nominal FDR", y = "True positive rate (TPR)",
          subtitle = "Comparison of \\textcolor{red}{LEMUR} against four other \\textcolor{gray!90}{DE. methods}") +
     theme(plot.title.position = "plot", strip.text = element_text(margin = margin(b = unit(-1, "cm"))))
@@ -711,7 +732,7 @@ power_per_desize_plot <- power_per_desize %>%
     scale_fill_manual(values = c("TRUE" = "darkblue", "FALSE" = "lightgrey")) +
     scale_x_log10(limits = c(50, NA), labels = scales::label_comma()) +
     scale_y_continuous(expand = expansion(add = c(0, 10)), breaks = c(0, 100, 200)) +
-    labs(title = "(K) Power by no. cell with expr. change",
+    labs(title = "(J) Power by no. cell with expr. change",
          subtitle = "Fraction of simulated genes (\\textcolor{gray!60!black}{grey}) with $\\textrm{FDR} < 0.1$ (\\textcolor{blue!60!black}{blue})",
          x = "No. cells with expr. change (log scale)", y = "No. genes") +
     theme(plot.title.position = "plot")
@@ -830,10 +851,10 @@ plot_assemble(
   add_plot(cowplot::get_legend(ct_scatter_plot) , x = 10, y = 88, width = 75, height = 10),
   add_plot(perf_pred_plot, x = 113, y = 50, width = 55, height = 40),
   
-  add_text("(F) Simulated DE", x = 2.7, y = 101.4, fontsize = font_size, vjust = 1, fontface = "bold"),
+  add_text("(E) Simulated DE", x = 2.7, y = 101.4, fontsize = font_size, vjust = 1, fontface = "bold"),
   add_plot(de_simulated_pl, x = 0, y = 100, width = 30, height = 45),
   add_plot(de_expr_pl, x = 25, y = 100, width = 30, height = 45),
-  add_text("(G) Predicted DE with neighborhood", x = 54, y = 101.4, fontsize = font_size, vjust = 1, fontface = "bold"),
+  add_text("(F) Predicted DE and neighborhood", x = 54, y = 101.4, fontsize = font_size, vjust = 1, fontface = "bold"),
   add_plot(de_pred_pl, x = 53, y = 100, width = 40, height = 45),
   add_plot(de_nei_pl, x = 83, y = 100, width = 35, height = 45),
   add_plot(prec_recall_plot + guides(color = "none"), x = 113, y = 100, width = 55, height = 42),
