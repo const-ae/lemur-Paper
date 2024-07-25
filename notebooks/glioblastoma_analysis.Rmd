@@ -784,7 +784,7 @@ plot_assemble(
   add_text("(A) Glioblastoma experimental design", x = 1.5, y = 1.5, vjust = 1, fontsize = font_size, fontface = "bold"),
   add_graphic("../illustrations/glioblastoma_experiment_overview_wideArtboard 1.pdf", x = 1.5,  y = 2.5, units = "mm"),
   
-  add_text("(B) Alignment with LEMUR adjusting for patient and treatment effect", x = 1.5, y = 24.5, vjust = 1, fontsize = font_size, fontface = "bold"),
+  add_text("(B) Integration with LEMUR adjusting for patient and treatment effect", x = 1.5, y = 24.5, vjust = 1, fontsize = font_size, fontface = "bold"),
   add_plot(condition_legend, x = 3, y = 31 , height = 34),
   add_text("UMAP of $\\matr{Y}$", x = 25 + row1_umap_width * 0.5, y = 30, vjust = 1, hjust = 0.5, fontsize = 7),
   add_text("UMAP of $\\matr{Z}$ if $\\matr{S} = I$", x = 25 + row1_umap_width * 1.5, y = 30, vjust = 1, hjust = 0.5, fontsize = 7),

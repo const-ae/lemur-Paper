@@ -749,7 +749,7 @@ var_duration_pl1 <- var_expl %>%
   filter(subset == "all" | is.na(subset)) %>%
   filter(dimensions > 3) %>%
   mutate(method = factor(method, levels = c("lemur", "pca", "lemur_landmark", "lemur_harmony"), 
-                         labels = c("LEMUR", "PCA", "LEMUR + Landmark Alignment", "LEMUR + Harmony Alignment"))) %>%
+                         labels = c("LEMUR", "PCA", "LEMUR + Landmark Integration", "LEMUR + Harmony Integration"))) %>%
   mutate(is_row_subset = n_genes == 500) %>%
   mutate(original_n_genes = max(n_genes), .by = dataset) %>%
   mutate(dataset = fct_reorder(dataset, n_cells)) %>%
@@ -772,8 +772,10 @@ var_duration_pl1 <- var_expl %>%
                  strip = ggh4x::strip_vanilla(clip = "off"), scales = "free_y") +
       scale_x_continuous(breaks = c(0, 100, 200), expand = expansion(mult = c(0, 0.1))) +
       scale_y_continuous(expand = expansion(mult = c(0, 0.1))) +
-      scale_color_manual(values = scales::hue_pal()(4) |> magrittr::set_names(c("LEMUR", "LEMUR + Landmark Alignment", "PCA", "LEMUR + Harmony Alignment"))) +
-      scale_linetype_manual(values = c("LEMUR" = "solid", "LEMUR + Landmark Alignment"  = "22", "PCA"  = "22", "LEMUR + Harmony Alignment"  = "solid")) +
+      scale_color_manual(values = scales::hue_pal()(4) |> 
+               magrittr::set_names(c("LEMUR", "LEMUR + Landmark Integration", "PCA", "LEMUR + Harmony Integration"))) +
+      scale_linetype_manual(values = c("LEMUR" = "solid", "LEMUR + Landmark Integration"  = "22", 
+                                       "PCA"  = "22", "LEMUR + Harmony Integration"  = "solid")) +
       coord_cartesian(ylim = c(0, if(is_subset) 4 else 11)) +
       labs(y = "Elapsed time [min.]",
            x = "Latent dimensions", color = "", linetype = "",
