@@ -5,6 +5,7 @@ pa <- argparser::arg_parser("Evaluate DE results")
 pa <- argparser::add_argument(pa, "--data", type = "character", nargs = Inf, help = "The name of the dataset")
 pa <- argparser::add_argument(pa, "--vals", type = "character", nargs = Inf, help = "The name of the condition")
 pa <- argparser::add_argument(pa, "--method", type = "character", nargs = Inf, help = "The name of the method")
+pa <- argparser::add_argument(pa, "--data_seeds", type = "character", nargs = Inf, help = "The name of the method")
 pa <- argparser::add_argument(pa, "--de_results_id", type = "character", nargs = Inf, help = "The id of the de_results")
 pa <- argparser::add_argument(pa, "--data_results_id", type = "character", nargs = Inf, help = "The id of the data job")
 
@@ -81,12 +82,14 @@ is_modified_group <- function(genes, is_modified, modified_cells, groups, pos_mi
 
 res <- tibble(data = pa$data,
               vals = pa$vals,
+              seeds = pa$data_seeds,
               method = pa$method, 
               de_results_id = pa$de_results_id,
               data_results_id = pa$data_results_id)
 
 de_results <- res %>%
-  mutate(de = map(de_results_id, \(id){
+  mutate(de = map2(de_results_id, seq_len(n()), \(id, index){
+    message("Read ", id, " at index ", index, "/", nrow(res))
     res <- as_tibble(readRDS(file.path(pa$working_dir, "results", id, "de_results.RDS"))) 
     if("cell_type" %in% colnames(res)){
       arrange(res, name, cell_type)
@@ -96,14 +99,14 @@ de_results <- res %>%
   }))
 
 data_info <- res %>%
-  distinct(data, vals, data_results_id) %>%
+  distinct(data, vals, seeds, data_results_id) %>%
   mutate(n_cells = map_dbl(data_results_id, \(id){
     sce <- qs::qread(file.path(pa$working_dir, "results", id))
     ncol(sce)
   }))
 
 gene_info <- res %>%
-  distinct(data, vals, data_results_id) %>%
+  distinct(data, vals, seeds, data_results_id) %>%
   mutate(genes = map(data_results_id, \(id){
     as_tibble(SummarizedExperiment::rowData(qs::qread(file.path(pa$working_dir, "results", id)))) %>%
       mutate(de_size = map_dbl(is_de_cell, \(x) sum(x != 0)))
@@ -112,12 +115,12 @@ gene_info <- res %>%
 
 global_ground_truths <- res %>%
   filter(str_starts(method, "lemur") | str_starts(method, "global")) %>%
-  left_join(gene_info) %>%
+  left_join(gene_info, by = c("data", "vals", "seeds")) %>%
   mutate(ground_truth = map(genes, \(x) x |> transmute(gene = name, group = NA, is_modified = is_simulated) |> arrange(gene)))
 
 cluster_ground_truths <- res %>%
   filter(str_starts(method, "cluster") | str_starts(method, "celltype") | str_starts(method, "miloDE")) %>%
-  left_join(gene_info) %>%
+  left_join(gene_info, by = c("data", "vals", "seeds")) %>%
   mutate(ground_truth = map2(genes, de_results_id, \(x, y){
     is_modified_group(x$name, is_modified = x$is_simulated, x$is_de_cell, readRDS(file.path(pa$working_dir, "results", y, "cluster_assignment.RDS")),
                       pos_min_cells = pa$pos_min_cells, pos_fraction = pa$pos_fraction, neg_fraction = pa$neg_fraction) %>%
@@ -127,8 +130,8 @@ cluster_ground_truths <- res %>%
 total_de_info <- left_join(
   de_results,
   bind_rows(global_ground_truths, cluster_ground_truths) %>% dplyr::select(-c(de_results_id, data_results_id)), 
-  by = c("data", "vals", "method")) %>%
-  left_join(data_info)
+  by = c("data", "vals", "seeds", "method")) %>%
+  left_join(data_info, by = c("data", "vals", "seeds", 'data_results_id'))
 
 nominal_fdr <- c(1e-3, seq(pa$nominal_fdr_min, pa$nominal_fdr_max, by = 0.01))
 power_res <- total_de_info  %>%
@@ -170,15 +173,16 @@ power_res <- total_de_info  %>%
         mutate(nominal_fdr = thres)
     }))
   }),
-  .by = c(data, vals, method)) 
+  .by = c(data, vals, seeds, method)) 
 
 
 # Save everything
-tmp_out_dir <- paste0(out_dir, "-tmp")
+tmp_out_dir <- paste0(outdir, "-tmp")
 dir.create(tmp_out_dir)
-saveRDS(total_de_info, file.path(tmp_out_dir, "de_results.RDS"))
+# This takes hours to write
+# saveRDS(total_de_info, file.path(tmp_out_dir, "de_results.RDS"))
 saveRDS(power_res, file.path(tmp_out_dir, "fdr_tpr_results.RDS"))
-file.rename(tmp_out_dir, out_dir)
+file.rename(tmp_out_dir, outdir)
 
 #### Session Info
 sessionInfo()

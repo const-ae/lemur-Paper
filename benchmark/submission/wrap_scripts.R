@@ -63,7 +63,7 @@ scvi_integration_prediction <- function(params, dep_job, duration = "24:00:00", 
 #------------------------------------------------------------------------------------------------------
 
 
-lemur_de <- function(params, dep_job, duration = "06:00:00", memory = "40GB"){
+lemur_de <- function(params, dep_job, duration = "02:00:00", memory = "40GB"){
   MyWorkflowManager::wrap_script("src/lemur_differential_expression.R", params = params, 
                                  dependencies = list(dep_job),
                                  duration = duration, memory = memory)
@@ -94,10 +94,10 @@ milo_de <- function(params, dep_job, duration = "01:00:00", memory = "20GB"){
 }
 
 
-evaluate_de_results <- function(params, dep_jobs, duration = "05:00:00", memory = "60GB"){
+evaluate_de_results <- function(params, dep_jobs, duration = "15:00:00", memory = "250GB", n_cpus = 1){
   MyWorkflowManager::wrap_script("src/evaluate_de_results.R", params = params, 
                                  dependencies = dep_jobs,
-                                 duration = duration, memory = memory)
+                                 duration = duration, memory = memory, n_cpus = n_cpus)
 }
 
 
