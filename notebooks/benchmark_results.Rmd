@@ -65,7 +65,7 @@ suppl_int_mix_plt <- perf_data %>%
   mutate(method = factor(method, levels = methods)) %>%
   filter(metric %in% c("mmd", "wasserstein", "mix", "batchSS_over_totalSS")) %>%
   mutate(metric = factor(metric, levels = c("mix", "mmd", "wasserstein", "batchSS_over_totalSS"),
-                         labels = c("kNN Mix $\\uparrow$", "$\\log$ MMD $\\downarrow$", "Wasserstein $\\downarrow$",  "Var. explained by condition $\\downarrow$"))) %>%
+                         labels = c("$k$-NN Mix $\\uparrow$", "$\\log$ MMD $\\downarrow$", "Wasserstein $\\downarrow$",  "Var. explained by condition $\\downarrow$"))) %>%
   ggplot(aes(x = method, y = value)) +
     ggbeeswarm::geom_quasirandom(size = 0.4, width = 0.3) +
     stat_summary(geom = "pointrange", fun.data = mean_se, color = "red", size = 1, fatten = 1) +
@@ -213,11 +213,11 @@ int_bio_pl <- int_bio_df %>%
     #                          size = font_size_small / .pt, point.padding = unit(3, "mm") ) +
     geom_text(data = int_bio_label_loc_df, aes(x = x, y = y, hjust = hjust, label = label), size = font_size_small / .pt) +
     annotation_custom(grid::polylineGrob(x = c(0.91, 0.99), y = c(0.91, 0.99), gp = grid::gpar(fill = "black"), arrow =  grid::arrow(ends = "last", type = "closed", angle = 20, length = unit(10 / 7, "mm")))) +
-    labs(y = "Biological signal retention\nARI normalized per dataset",x = "Integration of conditions\n$k$-NN mixing normalized per dataset") +
+    labs(y = "Biological signal retention\nARI standardized per dataset",x = "Integration of conditions\n$k$-NN mixing standardized per dataset") +
     scale_x_continuous(breaks = c(0, 1, 2), expand = expansion(add = c(0, 0.05))) +
     scale_y_continuous(breaks = c(0, 1), expand = expansion(add = c(0, 0.05))) +
     guides(color = "none") +
-    coord_fixed(xlim = c(0, 1.7), ylim = c(0, 1.3)) 
+    coord_fixed(xlim = c(0, 1.7), ylim = c(0, 1.5)) 
 
 int_bio_pl
 ```
@@ -237,7 +237,16 @@ kang_umap_annot_df <- perf_data %>%
   filter(comparison == "holdout_vs_train" | method == "harmony") %>%
   filter(method %in% c("PCA", "harmony", "lemur", "CPA", "scvi")) %>%
   mutate(method = factor(method, c("lemur", "PCA", "harmony", "CPA", "scvi"))) %>%
-  pivot_wider(names_from = "metric", values_from = "value")
+  pivot_wider(names_from = "metric", values_from = "value") %>%
+  mutate(knn_label = case_when(
+    method == "lemur" ~ glue("$k\\textrm{{-NN mix}} = {sprintf('%.2f', mix)}$"),
+    TRUE ~ sprintf('$%.2f$', mix)
+  ), ari_label = case_when(
+    method == "lemur" ~ glue("$\\textrm{{ARI}} = {sprintf('%.2f', ARI)}$"),
+    TRUE ~ sprintf('$%.2f$', ARI)
+  ),
+  label_hjust = ifelse(method == "lemur", 1, 0.5),
+  label_xpos = ifelse(method == "lemur", 10, 0))
 
 kang_plot <- kang_vis %>%
   filter(method %in% c("PCA", "harmony", "lemur", "CPA", "scvi")) %>%
@@ -246,10 +255,10 @@ kang_plot <- kang_vis %>%
   sample_frac(n = 1) %>%
   ggplot(aes(x = umap1, y = umap2)) +
     ggrastr::rasterize(geom_point(aes(color = covariate), size = 0.05, stroke = 0), dpi = 600) +
-    geom_text(data = kang_umap_annot_df, aes(x = 0, y = Inf, label = glue("$k\\textrm{{NN}} = {sprintf('%.2f', mix)}$")), 
-          size = font_size_small / .pt, hjust = 0.5, vjust = 1.5) +
-    geom_text(data = kang_umap_annot_df, aes(x = 0, y = Inf, label = glue("$\\textrm{{ARI}} = {sprintf('%.2f', ARI)}$")), 
-            size = font_size_small / .pt, hjust = 0.5, vjust = 3) +
+    geom_text(data = kang_umap_annot_df, aes(x = label_xpos, y = Inf, label = knn_label, hjust = label_hjust), 
+          size = font_size_small / .pt, vjust = 1.5) +
+    geom_text(data = kang_umap_annot_df, aes(x = label_xpos, y = Inf, label = ari_label, hjust = label_hjust), 
+            size = font_size_small / .pt, vjust = 3) +
     scale_color_manual(values = c("ctrl" = "#FC8D62", "stim" = "#8DA0CB")) +
     facet_wrap(vars(method), nrow = 1, labeller = as_labeller(c("lemur" = "LEMUR", "CPA" = "CPA", "PCA" = "PCA", "harmony" = "Harmony", "scvi" = "scVI"))) +
     guides(color = guide_legend(override.aes = list(size = 2))) +
@@ -260,6 +269,7 @@ kang_plot <- kang_vis %>%
 
 kang_plot
 ```
+
 
 
 ```{r}
@@ -408,10 +418,10 @@ perf_pred_plot <- pred_data_long %>%
     small_arrow(position = c(0.1, 0.01), offset = 0.03) +
     facet_wrap(vars(metric), labeller = as_labeller(c("l2_mean_per_celltype" = "Prediction error for 13 datasets"))) +
     scale_x_continuous(expand = expansion(mult = c(0, 0.1)), breaks = c(0, 1, 2)) +
-    scale_y_discrete(labels = c("lemur" = "LEMUR", "CPA" = "CPA", "no_change" = "Identity")) +
+    scale_y_discrete(labels = c("lemur" = "LEMUR", "CPA" = "CPA", "scvi" = "scVI", "no_change" = "Identity")) +
     coord_cartesian(xlim = c(0, 2)) +
     theme(axis.title.y = element_blank(), plot.title.position = "plot") +
-    labs(title = "(D) Prediction performance", x = "Mean $L_2 = ||\\textrm{pred} - \\textrm{obs}||_2$ per cell type")
+    labs(title = "(D) Prediction performance", x = "Prediction error per cell type\nstandardized per dataset")
 
 perf_pred_plot
 ```
@@ -442,8 +452,8 @@ ct_scatter_plot <- tidylog::inner_join(filter(kang_pred, method != "obs"),
   ggplot(aes(x = expression.obs, y = expression.pred)) +
     geom_abline() +
     ggrastr::rasterize(geom_point(aes(color = cell_type), size = 0.4, stroke = 0), dpi = 300) +
-    geom_text(data = l2_mean_dist_df, aes(x = 12, y = 22, label = glue("$L_2 = {sprintf('%.2f', value)}$")), 
-              size = font_size_small / .pt, halign = 0.5, ) +
+    geom_text(data = l2_mean_dist_df, aes(x = 0, y = 22, label = glue("$\\textrm{{Pred. error}} = {sprintf('%.2f', value)}$")), 
+              size = font_size_small / .pt, hjust = 0) +
     facet_wrap(vars(method.pred), nrow = 1, labeller = as_labeller(c("lemur" = "LEMUR", "CPA" = "CPA", "scvi" = "scVI", "no_change" = "Identity"))) +
     guides(color = guide_legend(override.aes = list(size = 2))) +
     coord_fixed() +
@@ -493,12 +503,13 @@ de_simulated_pl <- as_tibble(colData(lemur_fit)) %>%
   mutate(is_de = ifelse(is_de, "DE", "Not DE")) %>%
   mutate(is_de = fct_rev(is_de)) %>%
   ggplot(aes(x = umap[,1], y = umap[,2])) +
-    ggrastr::rasterize(geom_point(aes(color = is_de), size = 0.05, stroke = 0), dpi = 600) +
+    ggrastr::rasterize(geom_point(aes(color = is_de), size = 0.1, stroke = 0), dpi = 600) +
     small_axis(label = "UMAP", fontsize = font_size_small) +
     labs(#title = "(F) Simulated DE", 
          color = "") +
+    facet_wrap(vars("a"), nrow = 1, labeller = as_labeller(c("a" = "All cells"))) +
     guides(color = guide_legend(override.aes = list(size = 1))) +
-    theme(legend.position = "top")
+    theme(legend.position = "top", strip.text = element_text(margin = margin(b = -3, unit = "mm")))
 
 de_expr_pl <- as_tibble(colData(lemur_fit)) %>%
   mutate(umap) %>%
@@ -509,70 +520,60 @@ de_expr_pl <- as_tibble(colData(lemur_fit)) %>%
     # scale_color_viridis_c() +
     colorspace::scale_color_continuous_sequential(limits = c(0, quantile(assay(lemur_fit, "logcounts")[sel_gene,], c(0.98))), oob = scales::oob_squish, palette = "Purples 2", n.breaks = 3) +
     small_axis(label = "", fontsize = font_size_small, arrow_length = 5) +
-    labs(title = "", color = "Expr.") +
-    facet_wrap(vars(fake_condition), ncol = 1, labeller = as_labeller(c("fake_ctrl" = "Ctrl.", "fake_trt" = "Trt."))) +
-    guides(color = guide_colorbar(barwidth = unit(1, "mm"))) 
+    labs(title = "", color = "Expression") +
+    facet_wrap(vars(fake_condition), nrow = 1, labeller = as_labeller(c("fake_ctrl" = "Condition A", "fake_trt" = "Condition B"))) +
+    guides(color = guide_colorbar(barheight = unit(1, "mm")))  +
+    theme(legend.position = "top", strip.text = element_text(margin = margin(b = -3, unit = "mm")),
+          panel.spacing.y = unit(2, "mm"))
 
 de_pred_pl <- as_tibble(colData(lemur_fit)) %>%
   mutate(umap) %>%
   mutate(de_pred = assay(lemur_fit, "DE")[sel_gene,]) %>%
   ggplot(aes(x = umap[,1], y = umap[,2])) +
-    ggrastr::rasterize(geom_point(aes(color = de_pred), size = 0.05, stroke = 0), dpi = 600) +
+    ggrastr::rasterize(geom_point(aes(color = de_pred), size = 0.1, stroke = 0), dpi = 600) +
     # scale_colour_gradient2_rev(limits = c(-2.5, 2.5), oob = scales::oob_squish, breaks = c(-2, 0, 2), mid = "lightgrey") +
     scale_color_de_gradient(limits = c(-2.5, 2.5), breaks = c(-2, 0, 2), mid_width = 0.2) +
-    small_axis(label = "UMAP", fontsize = font_size_small) +
+    small_axis(label = "", fontsize = font_size_small, arrow_length = 5) +
     labs(#title = "(G) Predicted DE + Neighborhood", 
          color = "$\\Delta$") +
-    guides(color = guide_colorbar(barwidth = unit(1, "mm"))) 
+    facet_wrap(vars("a"), nrow = 1, labeller = as_labeller(c("a" = "All cells"))) +
+    guides(color = guide_colorbar(barheight = unit(1, "mm"))) +
+    theme(legend.position = "top", strip.text = element_text(margin = margin(b = -3, unit = "mm")))
 
 de_nei_pl <- as_tibble(colData(lemur_fit)) %>%
   mutate(umap) %>%
   mutate(is_de = lemur_fit$rowData$is_de_cell[[sel_gene]]) %>%
   mutate(inside = colnames(lemur_fit) %in% nei$neighborhood[[sel_gene]]) %>%
   ggplot(aes(x = umap[,1], y = umap[,2])) +
-    ggrastr::rasterize(geom_point(aes(color = is_de), size = 0.05, stroke = 0), dpi = 600) +
+    ggrastr::rasterize(geom_point(aes(color = is_de), size = 0.1, stroke = 0), dpi = 600) +
     small_axis(label = "", fontsize = font_size_small, arrow_length = 5) +
     guides(color = "none") +
     labs(title = " ") +
-    facet_wrap(vars(inside), ncol = 1, , labeller = as_labeller(c("TRUE" = "Inside", "FALSE" = "Outside")))
+    facet_wrap(vars(inside), nrow = 1, , labeller = as_labeller(c("TRUE" = "Inside", "FALSE" = "Outside"))) +
+    theme(strip.text = element_text(margin = margin(b = -3, unit = "mm")))
 
 de_simulated_pl
-de_pred_pl
 de_expr_pl
+de_pred_pl
 de_nei_pl
 ```
 
-
-```{r, paged.print =FALSE}
-prec_recall_df <- read_tsv("../benchmark/output/differential_expression-kang-recall_precision.tsv.gz") 
-  
-prec_recall_plot <- prec_recall_df %>%
-  mutate(recall = TP / de_n_cells, 
-         precision = TP / nei_size) %>%
-  mutate(highlighted = case_when(
-    data == "kang" & vals == "ctrl" & name == glue::glue("simulated_gene-{sel_gene}") ~ "special",
-    adj_pval < 0.1 ~ "signif",
-    TRUE ~ "not signif"
-  )) %>%
-  arrange(highlighted) %>%
-  ggplot(aes(x = recall, y = precision)) +
-    ggrastr::rasterize(geom_point(aes(color = highlighted, size =highlighted )), dpi = 300) +
-    # geom_point(data = . %>% filter(highlighted == "special"), size = 0.7, color = "red") +
-    scale_x_continuous(expand = expansion(0), breaks = c(0, 0.25, 0.5, 0.75, 1), labels = c("0", "0.25", "0.5", "0.75", "1")) +
-    scale_y_continuous(expand = expansion(0), breaks = c(0, 0.5, 1), labels = c("0", "0.5", "1")) +
-    scale_color_manual(values = c("special" = "red", "signif" = "black", "not signif" = "lightgrey"), 
-                       labels = c("special" = "Example\nfrom E,F", "signif" = "signif. genes", "not signif" = "not signif. genes")) +
-    scale_size_manual(values = c("special" = 0.7, "signif" = 0.4, "not signif" = 0.1)) +
-    guides(color = guide_legend(override.aes = list(alpha = 1, size = 1.5)), size = "none") +
-    coord_cartesian(clip = "off") +
-    labs(title = "(G) Neigh. comparison with ground truth",
-         subtitle = paste0("Precision: fraction of neighborhood inside ground truth\n",
-                           "Recall: fraction of ground truth inside neighborhood"), 
-         color = "", x = "Recall", y = "Precision") +
-    theme(plot.title.position = "plot", legend.position = "bottom")
-
-prec_recall_plot
+```{r}
+de_sim_legend <- my_get_legend(de_simulated_pl)
+de_expr_legend <- my_get_legend({
+  de_expr_pl +
+    guides(color = guide_colorbar(barheight = unit(0.75, "mm"), barwidth = unit(15, "mm"))) +
+    theme(legend.title = element_text(margin = margin(r = 2, unit = "mm")),
+          legend.text = element_text(size = font_size_tiny, margin = margin(t = 0.5, unit = "mm")))
+})
+de_pred_legend <- my_get_legend({
+  de_pred_pl +
+    guides(color = guide_colorbar(barheight = unit(0.75, "mm"), barwidth = unit(15, "mm"))) +
+    theme(legend.title = element_text(margin = margin(r = -4.5, unit = "mm")),
+          legend.text = element_text(size = font_size_tiny, margin = margin(t = 0.5, unit = "mm")))
+})
 ```
+
 
 
 
@@ -583,51 +584,10 @@ prec_recall_plot
 ```{r, paged.print=FALSE}
 de_power_fdr <- read_tsv("../benchmark/output/differential_expression_fdr_power-kmeans.tsv.gz") %>%
   mutate(extra_settings = ifelse(str_starts(method, "lemur_edgeR_"), str_remove(method, "lemur_edgeR_"), NA)) %>%
-  separate(method, into = c("method", "de_framework"))
+  separate(method, into = c("method", "de_framework")) %>%
+  summarize(across(c(TPR, TP, FDR), \(x) mean(x, na.rm=TRUE)), .by = -c(seeds, TPR, TP, FDR))
 ```
 
-```{r}
-de_power_fdr %>% distinct(data, vals)
-
-fdr_control_plot <- de_power_fdr %>%
-  filter(de_framework == "edgeR" & method == "lemur" & is.na(extra_settings)) %>%
-  ggplot(aes(x = nominal_fdr, y = FDR, group = paste0(data, method, vals))) +
-    geom_line(data = . %>% filter(method == "lemur"), color = "lightgrey", linewidth = 1) +
-    geom_line(data = . %>% filter(method == "lemur") %>% summarize(FDR = mean(FDR, na.rm = TRUE), .by = c(nominal_fdr)), 
-              aes(group = 1), color = "darkblue", linewidth = 1.3) +
-    geom_abline() +
-    coord_fixed(ylim = c(0, 0.3), xlim = c(0, 0.2)) +
-    scale_x_continuous(expand = expansion(0), breaks = c(0, 0.1, 0.2), labels = c("0", "0.1", "0.2")) +
-    scale_y_continuous(expand = expansion(0)) +
-    labs(title = "(H) FDR control", 
-         x = "Nominal FDR", y = "Observed FDR",
-         subtitle = "Eleven datasets (\\textcolor{blue!70!black}{mean})") +
-    theme(plot.title.position = "plot")
-
-fdr_control_plot
-```
-
-```{r}
-power_plot <- de_power_fdr %>%
-  filter(de_framework == "edgeR" & is.na(extra_settings)) %>%
-  mutate(data = dataset_labels[data]) %>%
-  mutate(data_vals = glue::glue("{data}\n{vals}")) %>%
-  mutate(is_lemur = method == "lemur") %>%
-  ggplot(aes(x = nominal_fdr, y = TPR)) +
-    geom_hline(yintercept = 0, linewidth = 0.3) +
-    geom_line(aes(color = is_lemur, group = paste0(method)), show.legend = FALSE) +
-    scale_color_manual(values = c("TRUE" = "red", "FALSE" = "grey")) +
-    ggh4x::facet_wrap2(vars(data_vals), nrow = 3, strip = ggh4x::strip_vanilla(clip = "off")) +
-    coord_cartesian(ylim = c(0, 0.75), xlim = c(0, 0.2)) +
-    scale_x_continuous(expand = expansion(add = c(0, 0.02)), breaks = c(0, 0.1, 0.2), labels = c("0", "0.1", "0.2")) +
-    scale_y_continuous(expand = expansion(0)) +
-    labs(title = "(I) DE-test Power", 
-         x = "Nominal FDR", y = "True positive rate (TPR)",
-         subtitle = "Comparison of \\textcolor{red}{LEMUR} against four other \\textcolor{gray!90}{DE. methods}") +
-    theme(plot.title.position = "plot", strip.text = element_text(margin = margin(b = unit(-1, "cm"))))
-
-power_plot
-```
 
 
 ```{r, paged.print = FALSE}
@@ -679,10 +639,10 @@ all_methods_power <- de_power_fdr_with_label %>%
   mutate(method_label = fct_reorder(method_label, rel_TPR, .fun = mean)) %>%
   ggplot(aes(x = rel_TPR, y = method_label)) +
     geom_vline(xintercept = 1, linewidth = 0.3, color = "black") +
-    ggbeeswarm::geom_quasirandom(color = "grey", width = 0.2, size = 0.5) +
-    stat_summary(aes(color = controls_fdr), geom = "pointrange", fun.data = mean_se, size = 0.4) +
+    ggbeeswarm::geom_quasirandom(color = "lightgrey", width = 0.2, size = 0.5) +
+    stat_summary(aes(color = controls_fdr), geom = "pointrange", fun = mean, size = 0.4) +
     ggh4x::facet_grid2(rows = vars(method), scales = "free_y", space = "free_y") +
-    scale_color_manual(values = c("TRUE" = "red", "FALSE" = "lightgrey")) +
+    scale_color_manual(values = c("TRUE" = "red", "FALSE" = "darkgrey")) +
     labs(color = "FDR control on average", y = "", x = "Relative TPR") +
     theme(strip.text = element_blank(), panel.spacing.y = unit(3, "mm"))
 fdr_control_plots
@@ -703,42 +663,61 @@ plot_assemble(
 
 ```
 
-For which dataset is the FDR not controlled?
+
 ```{r, paged.print=FALSE}
-de_power_fdr_with_label %>%
-  filter(nominal_fdr == 0.01) %>%
-  filter(is.na(es)) %>%
-  mutate(FDR = ifelse(is.na(FDR), 0, FDR)) %>%
-  filter(FDR > 0.1) %>%
-  dplyr::count(data, vals) %>%
-  arrange(desc(n))
-```
-
-
-```{r,paged.print=FALSE}
-power_per_desize <- read_tsv("../benchmark/output/differential_expression_fdr_power-kmeans-stratified.tsv.gz")
-
-
-power_per_desize_plot <- power_per_desize %>%
+all_de_power_fdr <- read_tsv("../benchmark/output/differential_expression_fdr_power-kmeans.tsv.gz") %>%
   mutate(extra_settings = ifelse(str_starts(method, "lemur_edgeR_"), str_remove(method, "lemur_edgeR_"), NA)) %>%
-  separate(method, into = c("method", "de_framework")) %>%
-  filter(de_framework == "edgeR" & is.na(extra_settings)) %>%
-  mutate(method = factor(method, levels = c("lemur", "global",  "cluster", "celltype", "miloDE"),
-                         labels = c("LEMUR", "Global", "Cluster*", "Cell type*", "miloDE*"))) %>%
-  ggplot(aes(x = de_size)) + 
-    geom_hline(yintercept = 0, linewidth = 0.3) +
-    geom_histogram(aes(fill = signif), bins = 30, show.legend = FALSE) +
-    ggh4x::facet_grid2(rows = vars(method), strip = ggh4x::strip_vanilla(clip = "off")) +
-    scale_fill_manual(values = c("TRUE" = "darkblue", "FALSE" = "lightgrey")) +
-    scale_x_log10(limits = c(50, NA), labels = scales::label_comma()) +
-    scale_y_continuous(expand = expansion(add = c(0, 10)), breaks = c(0, 100, 200)) +
-    labs(title = "(J) Power by no. cell with expr. change",
-         subtitle = "Fraction of simulated genes (\\textcolor{gray!60!black}{grey}) with $\\textrm{FDR} < 0.1$ (\\textcolor{blue!60!black}{blue})",
-         x = "No. cells with expr. change (log scale)", y = "No. genes") +
-    theme(plot.title.position = "plot")
-
-power_per_desize_plot
+  separate(method, into = c("method", "de_framework"))
 ```
+
+
+```{r, paged.print=FALSE}
+fdr_power_dat <- all_de_power_fdr %>%
+  filter(de_framework == "edgeR" & is.na(extra_settings)) %>%
+  filter(nominal_fdr == 0.1) %>%
+  mutate(method = factor(method, levels = c("global", "celltype", "cluster", "miloDE", "lemur"),
+                         labels = c("Global", "Cell type", "Cluster", "miloDE", "LEMUR"))) %>%
+  mutate(data = dataset_labels[data]) %>%
+  mutate(data_vals = glue::glue("{data}\n{vals}")) %>%
+  mutate(lemur_fdr = mean(FDR[method == "LEMUR"]), .by = c(data, vals)) %>%
+  mutate(data = fct_reorder(as.factor(data), lemur_fdr, max),
+         # vals = factor(vals, c("never", "heavy", "Control", "ctrl", "stim", "3m", "24m", "form", "0h", "1h", "4h"))
+         vals = fct_reorder(as.factor(vals), lemur_fdr, max)
+         ) 
+
+
+fdr_control_pl <- fdr_power_dat %>%
+  ggplot(aes(x = method, y = FDR)) +
+    ggbeeswarm::geom_quasirandom(aes(y = pmin(0.45, FDR)), size = 0.3, color = "lightgrey", width = 0.3) +
+    geom_hline(yintercept = 0.1) +
+    stat_summary(geom = "point", fun = mean, aes(color = method == "LEMUR")) +
+    scale_color_manual(values = c("TRUE" = "red", "FALSE" = "darkgrey")) +
+    scale_y_continuous(expand = expansion(add = 0)) +
+    ggh4x::facet_nested_wrap(vars(data, vals), nrow = 1, nest_line = element_line(colour = "#DDDDDD"), solo_line = TRUE) +
+    guides(x = guide_axis(angle = 90), color = "none") +
+    coord_cartesian(clip = "off", ylim = c(0, 0.45)) +
+    labs(y = "average $\\frac{\\textrm{FP}}{\\textrm{FP} + \\textrm{TP}}$") +
+    theme(panel.spacing.x = unit(3, "mm"), axis.title.x = element_blank(),
+          axis.text.x = element_blank())
+
+power_pl <- fdr_power_dat %>%
+  ggplot(aes(x = method, y = TPR)) +
+    ggbeeswarm::geom_quasirandom(size = 0.3, color = "lightgrey", width = 0.3) +
+    stat_summary(geom = "point", fun = mean, aes(color = method == "LEMUR")) +
+    ggh4x::facet_nested_wrap(vars(data, vals), nrow = 1, nest_line = element_line(colour = "#DDDDDD"), solo_line = TRUE) +
+    scale_color_manual(values = c("TRUE" = "red", "FALSE" = "darkgrey")) +
+    scale_y_continuous(expand = expansion(add = 0)) +
+    guides(x = guide_axis(angle = 90), color = "none") +
+    coord_cartesian(clip = "off") +
+    labs(y = "average $\\textrm{TPR}$") +
+    theme(panel.spacing.x = unit(3, "mm"), axis.title.x = element_blank(),
+          strip.text = element_text(size = 0))
+
+fdr_control_pl
+power_pl
+```
+
+
 
 ## Variance Explained
 
@@ -847,24 +826,26 @@ plot_assemble(
   add_text("(B) Integration Performance", x = 114.5, y = 1.5, fontsize = font_size, vjust = 1, fontface = "bold"),
   add_plot(int_bio_pl, x = 113, y = 5, width = 55, height = 42),
 
-  add_plot(ct_scatter_plot + guides(color = "none"), x = 0, y = 50, width = 110, height = 40),
-  add_plot(my_get_legend(ct_scatter_plot) , x = 10, y = 88, width = 75, height = 10),
-  add_plot(perf_pred_plot, x = 113, y = 50, width = 55, height = 40),
+  add_plot(ct_scatter_plot + guides(color = "none"), x = 0, y = 49, width = 110, height = 40),
+  add_plot(my_get_legend(ct_scatter_plot) , x = 10, y = 87, width = 75, height = 10),
+  add_plot(perf_pred_plot, x = 113, y = 49, width = 55, height = 42),
   
-  add_text("(E) Simulated DE", x = 2.7, y = 101.4, fontsize = font_size, vjust = 1, fontface = "bold"),
-  add_plot(de_simulated_pl, x = 0, y = 100, width = 30, height = 45),
-  add_plot(de_expr_pl, x = 25, y = 100, width = 30, height = 45),
-  add_text("(F) Predicted DE and neighborhood", x = 54, y = 101.4, fontsize = font_size, vjust = 1, fontface = "bold"),
-  add_plot(de_pred_pl, x = 53, y = 100, width = 40, height = 45),
-  add_plot(de_nei_pl, x = 83, y = 100, width = 35, height = 45),
-  add_plot(prec_recall_plot + guides(color = "none"), x = 113, y = 100, width = 55, height = 42),
-  add_plot(my_get_legend(prec_recall_plot), x = 115, y = 140, width = 50, height = 5),
+  add_text("(E) Simulated DE for one example gene", x = 2.7, y = 101.4, fontsize = font_size, vjust = 1, fontface = "bold"),
+  add_plot(de_simulated_pl + guides(color = "none"), x = 0, y = 101, width = 29, height = 38),
+  add_plot(de_sim_legend, x = 0, y = 135, width = 56, height = 3),
+  add_plot(de_expr_pl + guides(color = "none"), x = 29, y = 99, width = 56, height = 38),
+  add_plot(de_expr_legend, x = 40, y = 135, width = 56, height = 3),
+  add_text("(F) LEMUR predicted DE and inferred neighborhood", x = 87, y = 101.4, fontsize = font_size, vjust = 1, fontface = "bold"),
+  add_plot(de_pred_pl + guides(color = "none"), x = 87, y = 101, width = 29, height = 38),
+  add_plot(de_pred_legend, x = 90, y = 135, width = 56, height = 3),
+  add_plot(de_nei_pl + guides(color = "none"), x = 116, y = 99, width = 56, height = 38),
+  add_plot(de_sim_legend, x = 130, y = 135, width = 56, height = 3),
+
+  add_text("(G) Control of the FDR and power (at nominal $\\textrm{FDR}=10\\%$)", x = 2.7, y = 143, fontsize = font_size, vjust = 1, fontface = "bold"),
+  add_plot(fdr_control_pl, x = 0, y = 145, width = 170, height = 25),
+  add_plot(power_pl, x = 0, y = 168, width = 170, height = 30),
   
-  add_plot(fdr_control_plot, x = 0, y = 150, width = 40, height = 55),
-  add_plot(power_plot, x = 40, y = 150, width = 68, height = 55),
-  add_plot(power_per_desize_plot, x = 113, y = 150, width = 55, height = 55),
-  
-  width = 170, height = 205, units = "mm", show_grid_lines = FALSE,
+  width = 170, height = 198, units = "mm", show_grid_lines = FALSE,
   latex_support = TRUE, filename = "../plots/performance_validation.pdf"
 )
 ```
