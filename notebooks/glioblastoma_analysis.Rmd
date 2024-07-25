@@ -763,7 +763,7 @@ condition_legend <- my_get_legend(
 
 lmo2_legend <- my_get_legend({
   de_plots2 +
-    guides(color = guide_colorbar(title = "", label.theme = element_text(size = font_size_tiny, margin = margin(t = 0 , unit = "mm")), 
+    guides(color = guide_colorbar(title = "", label.theme = element_text(size = font_size_tiny, margin = margin(t = 0.5, unit = "mm")), 
                                  barheight = unit(1.5, "mm"), barwidth = unit(21, "mm")))
 })
 
