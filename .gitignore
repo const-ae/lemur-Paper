@@ -8,3 +8,6 @@ benchmark/output/*
 !benchmark/output/integration_results-random_holdout_hvg.tsv 
 !benchmark/output/prediction_results-random_holdout_hvg.tsv 
 !benchmark/output/variance_explained.tsv
+
+# Ignore tikzDictionary
+*tikzDictionary
