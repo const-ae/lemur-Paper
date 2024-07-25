@@ -287,6 +287,7 @@ kerat_expr_pl <- ggplot(kerat_expr_df, aes(x = umap[,1], y = umap[,2])) +
     small_axis(label = "UMAP", fontsize = font_size_small, 
                xlim = scales::expand_range(quantile(kerat_expr_df$umap[,1], c(0.05, 0.95)), mul = 0.5),
                ylim = scales::expand_range(quantile(kerat_expr_df$umap[,2], c(0.05, 0.95)), mul = 0.5)) +
+    guides(fill = "none") +
     labs(title = "(B) Gene expression of \\emph{krt8} in the periderm over time")
 
 kerat_expr_pl
@@ -311,6 +312,7 @@ nrxn2a_expr_pl <- ggplot(nrxn2a_expr_df, aes(x = umap[,1], y = umap[,2])) +
     small_axis(label = "UMAP", fontsize = font_size_small, 
                xlim = scales::expand_range(quantile(nrxn2a_expr_df$umap[,1], c(0.05, 0.95)), mul = 0.5),
                ylim = scales::expand_range(quantile(nrxn2a_expr_df$umap[,2], c(0.05, 0.95)), mul = 0.5)) +
+    guides(fill = "none") +
     labs(title = "(C) Gene expression of \\emph{nrxn2a} in the periderm over time")
 
 nrxn2a_expr_pl
