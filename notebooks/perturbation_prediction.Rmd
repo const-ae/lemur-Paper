@@ -37,6 +37,15 @@ res <- pert_res %>%
 
 
 ```{r, paged.print=FALSE}
+res %>%
+  filter(method == "ground_truth" & seed == 1) %>%
+  mutate(n_pert = lengths(map(perturbation_split, \(x) setdiff(x, "ctrl")))) %>%
+  dplyr::count(dataset_name, n_pert) 
+  
+```
+
+
+```{r, paged.print=FALSE}
 long2matrix <- function(x, rows, cols, values, ...){
   df_mat <- x |>
     transmute({{rows}}, {{cols}}, {{values}}) |>

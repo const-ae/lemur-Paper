@@ -25,6 +25,11 @@ nei <- qs::qread("../benchmark/output/cable_spatial_plaque_data/nei_small.qs")
 mouse_labels <- structure(paste0("Mouse ", 1:4), names = paste0("mouse_", 1:4))
 ```
 
+```{r, paged.print=FALSE}
+lemur.utils::count_labels_per_neighborhood(nei, labels = vars(class %in% c("Glutamatergic", "GABAergic")), 
+                                           fit = fit, cell_names = seq_len(ncol(fit))) %>%
+  mutate(frac = counts / total_counts)
+```
 
 
 ```{r, paged.print=FALSE}
@@ -137,6 +142,7 @@ subclass_name_table <- c("DG" = "Dentate gyrus", "CA1-ProS" = "CA1\n(prosubiculu
                           "L2/3 IT PPP" = "L2/3 IT PPP"
                          )
 
+
 full_cell_types_pl <- master_data %>%
   mutate(subclass_label = case_when(
     class == "GABAergic" ~ "GABAergic Neuron",
@@ -148,9 +154,13 @@ full_cell_types_pl <- master_data %>%
   mutate(subclass_label = fct_infreq(subclass_label)) %>%
   ggplot(aes(x = umap[,2], y = umap[,1])) +
     ggrastr::rasterize(geom_point(aes(color = subclass_label), size = 0.08, stroke = 0, show.legend = FALSE), dpi = 300) +
+    geom_density2d(data = master_data %>% filter(inside), breaks = 0.03, contour_var = "ndensity",
+                   color = "black", linetype = "dashed", linewidth = 0.6) +
     small_axis(label = "UMAP", fontsize = font_size_small) +
     guides(color = guide_legend(override.aes = list(size = 3))) +
     facet_wrap(vars(subclass_label), ncol = 6)
+
+full_cell_types_pl
 ```
 
 

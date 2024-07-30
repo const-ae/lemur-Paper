@@ -544,6 +544,7 @@ de_plot_data2 <- as_tibble(colData(fit_small), rownames = "cell_id") %>%
   inner_join(as_tibble(full_row_data), by = "gid") %>%
   inner_join(is_inside2, by = c("gid", "cell_id", "gene")) %>%
   filter(gid == "ENSG00000135363") %>%
+  tidylog::filter(cell_type == "Tumor cells") %>%
   sample_frac(size = 1) 
 
 
@@ -559,9 +560,9 @@ de_plots2 <- de_plot_data2 %>%
     # scale_colour_gradient2_rev(limits = c(-1, 1) * abs_max, oob = scales::squish, breaks = c(-1, 0, 1) * signif_to_zero(abs_max, 1), mid = "lightgrey", na.value = "#00000000") +
     scale_color_de_gradient(abs_max, mid_width = 0.2, na.value = "#00000000") +
     facet_wrap(vars(inside), nrow = 1, labeller = as_labeller(c("in" = "Cells in Neighborhood", "out" = "Other tumor cells")))  +
-    scale_x_continuous(limits = range(umap_fit[,1]) * 1.1) +
-    scale_y_continuous(limits = range(umap_fit[,2]) * 1.1) +
-    small_axis(label = "", fontsize = font_size_tiny, xlim = range(umap_fit[,1]), ylim = range(umap_fit[,2]), arrow_length = 3) +
+    scale_x_continuous(limits = quantile(de_plot_data2$umap[,1], c(0.01, 1)) * 1.1) +
+    scale_y_continuous(limits = c(-6, 6.8)) +
+    small_axis(label = "", fontsize = font_size_tiny, arrow_length = 3) +
     theme(panel.spacing.x = unit(-2, "mm"), legend.position = "bottom")
 
 de_plots2
@@ -625,7 +626,8 @@ diff_pl <- diff_df %>%
     geom_segment(color = "red", linewidth = 0.8, arrow = arrow(type = "closed", length = unit(1, "mm"))) +
     ggsignif::geom_signif(comparison = list(c("inside", "outside")), annotations = "**", textsize = font_size_small / .pt, y_position = 0.01) +
     scale_y_continuous(limits = c(-0.1, 0.1), expand = expansion(mult = c(0.05, 0.05)), n.breaks = 3) +
-    labs(subtitle = "$ \\text{Diff. in diff.}$\n($\\Delta_{\\text{in}} - \\Delta_{\\text{out}}$)",
+    scale_x_discrete(labels = c("inside" = "Nbh.", "outside" = "other")) +
+    labs(subtitle = "$ \\text{Diff. in diff.}$\n($\\Delta_{\\text{nbh}} - \\Delta_{\\text{other}}$)",
          y = "$\\Delta$") +
     theme(axis.title.x = element_blank(), plot.subtitle = element_text(hjust = 0.5)) 
 
@@ -633,6 +635,14 @@ comparison_pl2
 diff_pl
 ```
 
+```{r, paged.print=FALSE}
+nei_long <- lemur.utils::neighborhoods_to_long_data(nei_pan_tumor_small[nei_pan_tumor_small$name == "ENSG00000135363",], fit_small,
+                                        cell_names = colnames(qs::qread("../benchmark/output/glioblastoma/fit_hvg10k-small.qs")))
+lemur.utils::fit_pivot_longer(fit_small, genes = "ENSG00000135363", colnames = "cell_id") %>%
+  tidylog::left_join(nei_long, by = c("gene_id" = "name", "cell_id" = "cell")) %>%
+  dplyr::count(patient_id, inside, is_tumor = cell_type == "Tumor cells") %>%
+  arrange(is_tumor, inside, patient_id)
+```
 
 
 ```{r, paged.print=FALSE}
@@ -799,13 +809,13 @@ plot_assemble(
   add_plot(umap_fital_ct_pl, x = 25 + row1_umap_width * 2, y = 70, width = row1_umap_width, height = 40),
 
   add_text("(C) Panobinostat down-regulates \\emph{LMO2} in a subpopulation of tumor cells", x = 1.5, y = 111, vjust = 1, fontsize = font_size, fontface = "bold"),
-  add_plot(de_plots2 + guides(color = "none"), x = 0, y = 113, width = 61, height = 40),
+  add_plot(de_plots2 + guides(color = "none"), x = 0, y = 112.5, width = 61, height = 40),
   add_plot(lmo2_legend, x = 16.5, y = 151, width = 30, height = 5),
   add_text("down", x = 16, y = 150.9, vjust = 1, fontsize = font_size_small, hjust = 1),
   add_text("regulation", x = 16, y = 152.9, vjust = 1, fontsize = font_size_small, hjust = 1),
   add_text("up", x = 40.5, y = 150.9, vjust = 1, fontsize = font_size_small, hjust = 0),
   add_text("regulation", x = 40.5, y = 152.9, vjust = 1, fontsize = font_size_small, hjust = 0),
-  add_plot(comparison_pl2, x = 61, y = 114, width = 45, height = 41.8),
+  add_plot(comparison_pl2, x = 61, y = 114, width = 45, height = 41.6),
   add_plot(diff_pl, x = 104, y = 115, width = 25, height = 40.5),
 
 

@@ -418,13 +418,13 @@ display: none;
 ## 
 ##     anyMissing, rowMedians</code></pre>
 <pre class="r"><code>library(tidyverse)</code></pre>
-<pre><code>## ── Attaching core tidyverse packages ───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────── tidyverse 2.0.0 ──
+<pre><code>## ── Attaching core tidyverse packages ──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────── tidyverse 2.0.0 ──
 ## ✔ dplyr     1.1.3     ✔ readr     2.1.4
 ## ✔ forcats   1.0.0     ✔ stringr   1.5.0
 ## ✔ ggplot2   3.5.1     ✔ tibble    3.2.1
 ## ✔ lubridate 1.9.3     ✔ tidyr     1.3.0
 ## ✔ purrr     1.0.2</code></pre>
-<pre><code>## ── Conflicts ─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────── tidyverse_conflicts() ──
+<pre><code>## ── Conflicts ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────── tidyverse_conflicts() ──
 ## ✖ lubridate::%within%() masks IRanges::%within%()
 ## ✖ dplyr::collapse()     masks IRanges::collapse()
 ## ✖ dplyr::combine()      masks Biobase::combine(), BiocGenerics::combine()
@@ -625,93 +625,15 @@ pl2 &lt;- tibble(celltype = celltype_assign, condition = cond_assign,emb = fit$e
   width = 80, height = 68, units = &quot;mm&quot;, show_grid_lines = FALSE,
   latex_support = TRUE, filename = &quot;../plots/simulated_data.pdf&quot;
 )</code></pre>
-<pre><code>## Creating new TikZ metrics dictionary at:
-##  simulation_study-tikzDictionary</code></pre>
 <pre><code>## Using TikZ metrics dictionary at:
 ##  simulation_study-tikzDictionary</code></pre>
-<pre><code>## Measuring dimensions of: \bfseries{}(A)</code></pre>
-<pre><code>## Running command: &#39;/Library/TeX/texbin/pdflatex&#39; -interaction=batchmode -halt-on-error -output-directory &#39;/var/folders/dc/tppjxs9x6ll378lq88lz1fm40000gq/T//Rtmp7jCcWv/tikzDevice447b43b367a&#39; &#39;tikzStringWidthCalc.tex&#39;</code></pre>
-<pre><code>## Measuring dimensions of: \bfseries{}\char77</code></pre>
-<pre><code>## Running command: &#39;/Library/TeX/texbin/pdflatex&#39; -interaction=batchmode -halt-on-error -output-directory &#39;/var/folders/dc/tppjxs9x6ll378lq88lz1fm40000gq/T//Rtmp7jCcWv/tikzDevice447b4b7585c1&#39; &#39;tikzStringWidthCalc.tex&#39;</code></pre>
 <pre><code>## gg[gg1]</code></pre>
-<pre><code>## Measuring dimensions of: \char77</code></pre>
-<pre><code>## Running command: &#39;/Library/TeX/texbin/pdflatex&#39; -interaction=batchmode -halt-on-error -output-directory &#39;/var/folders/dc/tppjxs9x6ll378lq88lz1fm40000gq/T//Rtmp7jCcWv/tikzDevice447b10a0689b&#39; &#39;tikzStringWidthCalc.tex&#39;</code></pre>
-<pre><code>## Measuring dimensions of: \char103</code></pre>
-<pre><code>## Running command: &#39;/Library/TeX/texbin/pdflatex&#39; -interaction=batchmode -halt-on-error -output-directory &#39;/var/folders/dc/tppjxs9x6ll378lq88lz1fm40000gq/T//Rtmp7jCcWv/tikzDevice447b1333a0a4&#39; &#39;tikzStringWidthCalc.tex&#39;</code></pre>
-<pre><code>## Measuring dimensions of: \char106</code></pre>
-<pre><code>## Running command: &#39;/Library/TeX/texbin/pdflatex&#39; -interaction=batchmode -halt-on-error -output-directory &#39;/var/folders/dc/tppjxs9x6ll378lq88lz1fm40000gq/T//Rtmp7jCcWv/tikzDevice447b227778d5&#39; &#39;tikzStringWidthCalc.tex&#39;</code></pre>
-<pre><code>## Measuring dimensions of: \char112</code></pre>
-<pre><code>## Running command: &#39;/Library/TeX/texbin/pdflatex&#39; -interaction=batchmode -halt-on-error -output-directory &#39;/var/folders/dc/tppjxs9x6ll378lq88lz1fm40000gq/T//Rtmp7jCcWv/tikzDevice447b519df9a0&#39; &#39;tikzStringWidthCalc.tex&#39;</code></pre>
-<pre><code>## Measuring dimensions of: \char113</code></pre>
-<pre><code>## Running command: &#39;/Library/TeX/texbin/pdflatex&#39; -interaction=batchmode -halt-on-error -output-directory &#39;/var/folders/dc/tppjxs9x6ll378lq88lz1fm40000gq/T//Rtmp7jCcWv/tikzDevice447b5a6fa13c&#39; &#39;tikzStringWidthCalc.tex&#39;</code></pre>
-<pre><code>## Measuring dimensions of: \char121</code></pre>
-<pre><code>## Running command: &#39;/Library/TeX/texbin/pdflatex&#39; -interaction=batchmode -halt-on-error -output-directory &#39;/var/folders/dc/tppjxs9x6ll378lq88lz1fm40000gq/T//Rtmp7jCcWv/tikzDevice447b56c29886&#39; &#39;tikzStringWidthCalc.tex&#39;</code></pre>
-<pre><code>## Measuring dimensions of: \char81</code></pre>
-<pre><code>## Running command: &#39;/Library/TeX/texbin/pdflatex&#39; -interaction=batchmode -halt-on-error -output-directory &#39;/var/folders/dc/tppjxs9x6ll378lq88lz1fm40000gq/T//Rtmp7jCcWv/tikzDevice447b1abb1ea&#39; &#39;tikzStringWidthCalc.tex&#39;</code></pre>
-<pre><code>## Measuring dimensions of: gjpqyQ</code></pre>
-<pre><code>## Running command: &#39;/Library/TeX/texbin/pdflatex&#39; -interaction=batchmode -halt-on-error -output-directory &#39;/var/folders/dc/tppjxs9x6ll378lq88lz1fm40000gq/T//Rtmp7jCcWv/tikzDevice447b2f2d7a81&#39; &#39;tikzStringWidthCalc.tex&#39;</code></pre>
-<pre><code>## Measuring dimensions of: -3</code></pre>
-<pre><code>## Running command: &#39;/Library/TeX/texbin/pdflatex&#39; -interaction=batchmode -halt-on-error -output-directory &#39;/var/folders/dc/tppjxs9x6ll378lq88lz1fm40000gq/T//Rtmp7jCcWv/tikzDevice447b52c5c359&#39; &#39;tikzStringWidthCalc.tex&#39;</code></pre>
-<pre><code>## Measuring dimensions of: -2</code></pre>
-<pre><code>## Running command: &#39;/Library/TeX/texbin/pdflatex&#39; -interaction=batchmode -halt-on-error -output-directory &#39;/var/folders/dc/tppjxs9x6ll378lq88lz1fm40000gq/T//Rtmp7jCcWv/tikzDevice447b359c3283&#39; &#39;tikzStringWidthCalc.tex&#39;</code></pre>
-<pre><code>## Measuring dimensions of: -1</code></pre>
-<pre><code>## Running command: &#39;/Library/TeX/texbin/pdflatex&#39; -interaction=batchmode -halt-on-error -output-directory &#39;/var/folders/dc/tppjxs9x6ll378lq88lz1fm40000gq/T//Rtmp7jCcWv/tikzDevice447b21b851f4&#39; &#39;tikzStringWidthCalc.tex&#39;</code></pre>
-<pre><code>## Measuring dimensions of: 0</code></pre>
-<pre><code>## Running command: &#39;/Library/TeX/texbin/pdflatex&#39; -interaction=batchmode -halt-on-error -output-directory &#39;/var/folders/dc/tppjxs9x6ll378lq88lz1fm40000gq/T//Rtmp7jCcWv/tikzDevice447b4c0c7b77&#39; &#39;tikzStringWidthCalc.tex&#39;</code></pre>
-<pre><code>## Measuring dimensions of: 1</code></pre>
-<pre><code>## Running command: &#39;/Library/TeX/texbin/pdflatex&#39; -interaction=batchmode -halt-on-error -output-directory &#39;/var/folders/dc/tppjxs9x6ll378lq88lz1fm40000gq/T//Rtmp7jCcWv/tikzDevice447b477de8a2&#39; &#39;tikzStringWidthCalc.tex&#39;</code></pre>
-<pre><code>## Measuring dimensions of: 2</code></pre>
-<pre><code>## Running command: &#39;/Library/TeX/texbin/pdflatex&#39; -interaction=batchmode -halt-on-error -output-directory &#39;/var/folders/dc/tppjxs9x6ll378lq88lz1fm40000gq/T//Rtmp7jCcWv/tikzDevice447b1b340859&#39; &#39;tikzStringWidthCalc.tex&#39;</code></pre>
-<pre><code>## Measuring dimensions of: 3</code></pre>
-<pre><code>## Running command: &#39;/Library/TeX/texbin/pdflatex&#39; -interaction=batchmode -halt-on-error -output-directory &#39;/var/folders/dc/tppjxs9x6ll378lq88lz1fm40000gq/T//Rtmp7jCcWv/tikzDevice447b75101902&#39; &#39;tikzStringWidthCalc.tex&#39;</code></pre>
-<pre><code>## Measuring dimensions of: control</code></pre>
-<pre><code>## Running command: &#39;/Library/TeX/texbin/pdflatex&#39; -interaction=batchmode -halt-on-error -output-directory &#39;/var/folders/dc/tppjxs9x6ll378lq88lz1fm40000gq/T//Rtmp7jCcWv/tikzDevice447b73da0e58&#39; &#39;tikzStringWidthCalc.tex&#39;</code></pre>
-<pre><code>## Measuring dimensions of: treated</code></pre>
-<pre><code>## Running command: &#39;/Library/TeX/texbin/pdflatex&#39; -interaction=batchmode -halt-on-error -output-directory &#39;/var/folders/dc/tppjxs9x6ll378lq88lz1fm40000gq/T//Rtmp7jCcWv/tikzDevice447b70e3eed3&#39; &#39;tikzStringWidthCalc.tex&#39;</code></pre>
-<pre><code>## Measuring dimensions of: Gene 2</code></pre>
-<pre><code>## Running command: &#39;/Library/TeX/texbin/pdflatex&#39; -interaction=batchmode -halt-on-error -output-directory &#39;/var/folders/dc/tppjxs9x6ll378lq88lz1fm40000gq/T//Rtmp7jCcWv/tikzDevice447b454988c&#39; &#39;tikzStringWidthCalc.tex&#39;</code></pre>
-<pre><code>## Measuring dimensions of: Gene 1</code></pre>
-<pre><code>## Running command: &#39;/Library/TeX/texbin/pdflatex&#39; -interaction=batchmode -halt-on-error -output-directory &#39;/var/folders/dc/tppjxs9x6ll378lq88lz1fm40000gq/T//Rtmp7jCcWv/tikzDevice447b4deb118c&#39; &#39;tikzStringWidthCalc.tex&#39;</code></pre>
-<pre><code>## Measuring dimensions of: $o$: base space</code></pre>
-<pre><code>## Running command: &#39;/Library/TeX/texbin/pdflatex&#39; -interaction=batchmode -halt-on-error -output-directory &#39;/var/folders/dc/tppjxs9x6ll378lq88lz1fm40000gq/T//Rtmp7jCcWv/tikzDevice447b3cd264b&#39; &#39;tikzStringWidthCalc.tex&#39;</code></pre>
-<pre><code>## Measuring dimensions of: $\matr{R}(\textrm{control})$</code></pre>
-<pre><code>## Running command: &#39;/Library/TeX/texbin/pdflatex&#39; -interaction=batchmode -halt-on-error -output-directory &#39;/var/folders/dc/tppjxs9x6ll378lq88lz1fm40000gq/T//Rtmp7jCcWv/tikzDevice447b118d07e0&#39; &#39;tikzStringWidthCalc.tex&#39;</code></pre>
-<pre><code>## Measuring dimensions of: $\matr{R}(\textrm{treated})$</code></pre>
-<pre><code>## Running command: &#39;/Library/TeX/texbin/pdflatex&#39; -interaction=batchmode -halt-on-error -output-directory &#39;/var/folders/dc/tppjxs9x6ll378lq88lz1fm40000gq/T//Rtmp7jCcWv/tikzDevice447b42000c20&#39; &#39;tikzStringWidthCalc.tex&#39;</code></pre>
-<pre><code>## Measuring dimensions of: -2</code></pre>
-<pre><code>## Running command: &#39;/Library/TeX/texbin/pdflatex&#39; -interaction=batchmode -halt-on-error -output-directory &#39;/var/folders/dc/tppjxs9x6ll378lq88lz1fm40000gq/T//Rtmp7jCcWv/tikzDevice447b111c2aba&#39; &#39;tikzStringWidthCalc.tex&#39;</code></pre>
-<pre><code>## Measuring dimensions of: \char77</code></pre>
-<pre><code>## Running command: &#39;/Library/TeX/texbin/pdflatex&#39; -interaction=batchmode -halt-on-error -output-directory &#39;/var/folders/dc/tppjxs9x6ll378lq88lz1fm40000gq/T//Rtmp7jCcWv/tikzDevice447b5039221c&#39; &#39;tikzStringWidthCalc.tex&#39;</code></pre>
-<pre><code>## Measuring dimensions of: -1</code></pre>
-<pre><code>## Running command: &#39;/Library/TeX/texbin/pdflatex&#39; -interaction=batchmode -halt-on-error -output-directory &#39;/var/folders/dc/tppjxs9x6ll378lq88lz1fm40000gq/T//Rtmp7jCcWv/tikzDevice447b56ee8569&#39; &#39;tikzStringWidthCalc.tex&#39;</code></pre>
-<pre><code>## Measuring dimensions of: 0</code></pre>
-<pre><code>## Running command: &#39;/Library/TeX/texbin/pdflatex&#39; -interaction=batchmode -halt-on-error -output-directory &#39;/var/folders/dc/tppjxs9x6ll378lq88lz1fm40000gq/T//Rtmp7jCcWv/tikzDevice447b4578dd15&#39; &#39;tikzStringWidthCalc.tex&#39;</code></pre>
-<pre><code>## Measuring dimensions of: 1</code></pre>
-<pre><code>## Running command: &#39;/Library/TeX/texbin/pdflatex&#39; -interaction=batchmode -halt-on-error -output-directory &#39;/var/folders/dc/tppjxs9x6ll378lq88lz1fm40000gq/T//Rtmp7jCcWv/tikzDevice447b1fab155&#39; &#39;tikzStringWidthCalc.tex&#39;</code></pre>
-<pre><code>## Measuring dimensions of: 2</code></pre>
-<pre><code>## Running command: &#39;/Library/TeX/texbin/pdflatex&#39; -interaction=batchmode -halt-on-error -output-directory &#39;/var/folders/dc/tppjxs9x6ll378lq88lz1fm40000gq/T//Rtmp7jCcWv/tikzDevice447b71904476&#39; &#39;tikzStringWidthCalc.tex&#39;</code></pre>
-<pre><code>## Measuring dimensions of: -4</code></pre>
-<pre><code>## Running command: &#39;/Library/TeX/texbin/pdflatex&#39; -interaction=batchmode -halt-on-error -output-directory &#39;/var/folders/dc/tppjxs9x6ll378lq88lz1fm40000gq/T//Rtmp7jCcWv/tikzDevice447b367ed939&#39; &#39;tikzStringWidthCalc.tex&#39;</code></pre>
-<pre><code>## Measuring dimensions of: -3</code></pre>
-<pre><code>## Running command: &#39;/Library/TeX/texbin/pdflatex&#39; -interaction=batchmode -halt-on-error -output-directory &#39;/var/folders/dc/tppjxs9x6ll378lq88lz1fm40000gq/T//Rtmp7jCcWv/tikzDevice447b41e74922&#39; &#39;tikzStringWidthCalc.tex&#39;</code></pre>
-<pre><code>## Measuring dimensions of: 3</code></pre>
-<pre><code>## Running command: &#39;/Library/TeX/texbin/pdflatex&#39; -interaction=batchmode -halt-on-error -output-directory &#39;/var/folders/dc/tppjxs9x6ll378lq88lz1fm40000gq/T//Rtmp7jCcWv/tikzDevice447b377278fb&#39; &#39;tikzStringWidthCalc.tex&#39;</code></pre>
-<pre><code>## Measuring dimensions of: $\operatorname{Exp}^{(\textrm{Gr})}_{o}(x \matr{B})$</code></pre>
-<pre><code>## Running command: &#39;/Library/TeX/texbin/pdflatex&#39; -interaction=batchmode -halt-on-error -output-directory &#39;/var/folders/dc/tppjxs9x6ll378lq88lz1fm40000gq/T//Rtmp7jCcWv/tikzDevice447b3c64c32d&#39; &#39;tikzStringWidthCalc.tex&#39;</code></pre>
-<pre><code>## Measuring dimensions of: $x \matr{\Gamma}$</code></pre>
-<pre><code>## Running command: &#39;/Library/TeX/texbin/pdflatex&#39; -interaction=batchmode -halt-on-error -output-directory &#39;/var/folders/dc/tppjxs9x6ll378lq88lz1fm40000gq/T//Rtmp7jCcWv/tikzDevice447b7b49de54&#39; &#39;tikzStringWidthCalc.tex&#39;</code></pre>
 <pre><code>## gg[gg2]</code></pre>
-<pre><code>## Measuring dimensions of: \bfseries{}(B)</code></pre>
-<pre><code>## Running command: &#39;/Library/TeX/texbin/pdflatex&#39; -interaction=batchmode -halt-on-error -output-directory &#39;/var/folders/dc/tppjxs9x6ll378lq88lz1fm40000gq/T//Rtmp7jCcWv/tikzDevice447b2ea39c08&#39; &#39;tikzStringWidthCalc.tex&#39;</code></pre>
 <pre><code>## gg[gg3]</code></pre>
 <pre><code>## Warning: Removed 32 rows containing missing values or values outside the scale
 ## range (`geom_segment()`).</code></pre>
 <pre><code>## Warning: Removed 6 rows containing missing values or values outside the scale range (`geom_text()`).
 ## Removed 6 rows containing missing values or values outside the scale range (`geom_text()`).</code></pre>
-<pre><code>## Measuring dimensions of: $\matr{\Delta}$ (Treated - Control)</code></pre>
-<pre><code>## Running command: &#39;/Library/TeX/texbin/pdflatex&#39; -interaction=batchmode -halt-on-error -output-directory &#39;/var/folders/dc/tppjxs9x6ll378lq88lz1fm40000gq/T//Rtmp7jCcWv/tikzDevice447b7758e923&#39; &#39;tikzStringWidthCalc.tex&#39;</code></pre>
-<pre><code>## Measuring dimensions of: Embedding Position ($\matr{Z}$)</code></pre>
-<pre><code>## Running command: &#39;/Library/TeX/texbin/pdflatex&#39; -interaction=batchmode -halt-on-error -output-directory &#39;/var/folders/dc/tppjxs9x6ll378lq88lz1fm40000gq/T//Rtmp7jCcWv/tikzDevice447b6e32360b&#39; &#39;tikzStringWidthCalc.tex&#39;</code></pre>
 <pre><code>## gg[gg4]</code></pre>
 <div id="session-info" class="section level1">
 <h1>Session info</h1>

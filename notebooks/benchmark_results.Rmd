@@ -207,8 +207,8 @@ int_bio_pl <- int_bio_df %>%
   unpack(bootstrap_samples) %>%
   unnest(value) %>%
   ggplot(aes(x = value[,1], y = value[,2])) +
-    geom_density2d(aes(color = method), adjust = 3, contour_var = "ndensity", breaks = seq(0.9, 0.2, length.out = 3)) +
-    geom_point(data = int_bio_df, aes(x =  mix / avg_mix, y = ARI / avg_ARI, color = stage(method, after_scale = colorspace::lighten(colour, 0.3))), alpha = 0.3, size = 0.1) +
+    geom_density2d(aes(color = stage(method, after_scale = colorspace::lighten(colour, 0.3))), adjust = 3, contour_var = "ndensity", breaks = seq(0.9, 0.2, length.out = 3)) +
+    geom_point(data = int_bio_df, aes(x =  mix / avg_mix, y = ARI / avg_ARI, color = method), alpha = 0.4, size = 0.8, stroke = 0) +
     # ggrepel::geom_text_repel(data = . %>% summarize(value = matrix(colMeans(value, na.rm=TRUE), nrow = 1), .by = method), aes(label = method_labels[method]), 
     #                          size = font_size_small / .pt, point.padding = unit(3, "mm") ) +
     geom_text(data = int_bio_label_loc_df, aes(x = x, y = y, hjust = hjust, label = label), size = font_size_small / .pt) +
@@ -681,8 +681,8 @@ fdr_power_dat <- all_de_power_fdr %>%
   mutate(data_vals = glue::glue("{data}\n{vals}")) %>%
   mutate(lemur_fdr = mean(FDR[method == "LEMUR"]), .by = c(data, vals)) %>%
   mutate(data = fct_reorder(as.factor(data), lemur_fdr, max),
-         # vals = factor(vals, c("never", "heavy", "Control", "ctrl", "stim", "3m", "24m", "form", "0h", "1h", "4h"))
-         vals = fct_reorder(as.factor(vals), lemur_fdr, max)
+         vals = factor(vals, c("never", "heavy", "Control", "ctrl", "stim", "3m", "24m", "form", "0h", "1h", "4h"))
+         # vals = fct_reorder(as.factor(vals), lemur_fdr, max)
          ) 
 
 
