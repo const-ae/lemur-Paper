@@ -26,7 +26,7 @@ dataset_labels <- c("angelidis" = "Angelidis", "aztekin" = "Aztekin", "bunis" = 
 
 ```{r}
 method_labels <-  c("PCA" = "PCA", "harmony" = "Harmony", "invertible_harmony" = "Param. Harmony",
-                    "multiCondPCA" = "Rigid LEMUR", "lemur" = "LEMUR", "CPA" = "CPA", "scvi" = "scVI")
+                    "multiCondPCA" = "multi-cond. PCA", "lemur" = "LEMUR", "CPA" = "CPA", "scvi" = "scVI")
 ```
 
 
@@ -298,7 +298,7 @@ pred_data <- read_tsv(glue("../benchmark/output/prediction_results-{variation}.t
 ```{r}
 pred_methods <- c("linear", "PCA", "harmony", "invertible_harmony", "multiCondPCA", "lemur", "CPA", "scvi", "no_change")
 pred_method_labels <-  c("linear" = "Linear", "PCA" = "PCA", "harmony" = "Harmony", "invertible_harmony" = "Param. Harmony",
-                    "multiCondPCA" = "Rigid LEMUR", "lemur" = "LEMUR", "CPA" = "CPA", "scvi" = "scVI", "no_change" = "Identity")
+                    "multiCondPCA" = "multi-cond PCA", "lemur" = "LEMUR", "CPA" = "CPA", "scvi" = "scVI", "no_change" = "Identity")
 pred_metrics <- c("l2_mean", "l2_mean_per_celltype", "l2_sd", "l2_sd_per_celltype", "r2_mean",
                          "r2_mean_per_celltype", "r2_sd", "r2_sd_per_celltype", "mmd", "wasserstein")
 pred_metrics_labels <- c("l2_mean" = "$L_2$ over all cells $\\downarrow$", "l2_mean_per_celltype" = "$L_2$ per cell type $\\downarrow$",
@@ -352,7 +352,7 @@ pl1 <- full_data_rel %>%
           panel.spacing.y = unit(5, "mm"), panel.spacing.x = unit(3, "mm")) +
     labs(title = "Distance and correlation measures between predicted and observed expression",
          subtitle = "There are two points per dataset (A vs B and B vs A)",
-         y = "distance (normalized per dataset)")
+         y = "distance (standardized per dataset)")
 
 pl2 <- full_data_rel %>%
   filter(str_starts(metric, "r2")) %>%
@@ -599,7 +599,7 @@ de_power_fdr_with_label <- de_power_fdr %>%
     str_starts(es, "testfrac_") ~ glue("$\\text{{test fraction}} = {as.numeric(str_remove(es, 'testfrac_')) * 100}\\%$"),
     es == "sel_contrast" ~ "contrast selection",
     es == "dir_contrast" ~ "contrast directions",
-    es == "skip_al" ~ "$\\matr{S}=I$ (rigid)",
+    es == "skip_al" ~ "$\\matr{S}=I$",
     es == "skip_multCondPCA" ~ "parametric Harmony",
     es == "sf_method_ratio" ~ "ratio size factor",
     es == "count_split" ~ "count splitting",
