@@ -88,7 +88,7 @@ cell_type_dot_plot <- as_tibble(as.matrix(t(expr_mat))) %>%
     scale_y_discrete(expand = expansion(add = 0.4), labels = \(x) paste0("\\emph{", x, "}")) +
     coord_cartesian(clip = "off") +
     guides(color = guide_colorbar(barheight = unit(1, "mm"), barwidth = unit(5, "mm"), title.vjust = 0.25, label.position = "top", label.vjust = -2),
-           size = guide_bins(label.vjust = -11)) +
+           size = guide_bins(theme = theme(legend.text = element_text(vjust = 3)))) +
     theme(axis.title = element_blank(), legend.position = c(0,-0.2), legend.direction = "horizontal",
           legend.box = "horizontal", legend.text = element_text(size = font_size_tiny),
           strip.background = element_blank(), strip.text = element_blank(), panel.spacing.y = unit(1.5, "mm")) +
@@ -223,7 +223,7 @@ annotation_pl <- cowplot::ggdraw() +
 
 ```{r, paged.print=FALSE}
 plot_assemble(add_text("(A) Glioblastoma cell type assignment", x = 1.5, y = 1.5, vjust = 1, fontsize = font_size, fontface = "bold"),
-              add_plot(cowplot::get_legend(cell_type_legend_suppl), x = 3, y = 5, height = 5),
+              add_plot(my_get_legend(cell_type_legend_suppl), x = 3, y = 5, height = 5),
               add_plot(cell_type_dot_plot , x = 0, y = 10, width = 70, height = 40),
               
               add_text("(B) Aneuploidie", x = 95, y = 1.5, vjust = 1, fontsize = font_size, fontface = "bold"),
@@ -518,7 +518,8 @@ comparison_pl
 ```{r, paged.print=FALSE}
 plot_assemble(add_text("(A) Expression pattern of selected genes under panobinostat treatment", x = 1.5, y = 1.5, vjust = 1, fontsize = font_size, fontface = "bold"),
               add_plot(expr_plots, x = 0, y = 5, width = 170, height = 50),
-              add_text("(B) Predicted differential expression pattern ($\\Delta$)", x = 1.5, y = 57, vjust = 1, fontsize = font_size, fontface = "bold"),
+              add_text("(B) Predicted differential expression pattern ($\\Delta = \\hat{\\matr{Y}}^{\\textrm{pan}} - \\hat{\\matr{Y}}^{\\textrm{ctrl}}$)",
+                       x = 1.5, y = 57, vjust = 1, fontsize = font_size, fontface = "bold"),
               add_plot(de_plots, x = 0, y = 60, width = 170, height = 50),
               add_text("(C) Pseudobulked differential expression", x = 1.5, y = 117, vjust = 1, fontsize = font_size, fontface = "bold"),
               add_plot(comparison_plots, x = 0, y = 120, width = 170, height = 30),
