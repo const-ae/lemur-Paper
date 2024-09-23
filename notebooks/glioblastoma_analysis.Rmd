@@ -484,8 +484,6 @@ comparison_plots <- as_tibble(colData(psce)) %>%
 
 comparison_plots
 ```
-
-
 ```{r}
 comparison_pl <- as_tibble(colData(psce)) %>%
   mutate(expr_inside = as_tibble(t(assay(psce, "inside")))) %>%
@@ -551,7 +549,7 @@ de_plot_data2 <- as_tibble(colData(fit_small), rownames = "cell_id") %>%
 
 abs_max <- max(abs(quantile(de_plot_data2$de, c(0.95, 0.05))))
 
-  
+
 de_plots2 <- de_plot_data2 %>%
   mutate(inside = ifelse(inside, "in", "out")) %>%
   mutate(inside = factor(inside, levels = c("in", "out")))  %>%
@@ -569,7 +567,9 @@ de_plots2 <- de_plot_data2 %>%
 de_plots2
 ```
 
-
+```{r, paged.print=FALSE}
+filter(nei_pan_tumor_small, name == "ENSG00000135363")
+```
 
 ```{r, paged.print = FALSE}
 genes_of_interest <- c("ENSG00000135363")
@@ -625,8 +625,10 @@ diff_pl <- diff_df %>%
   ggplot(aes(x = origin, xend = origin, y = 0, yend = panobinostat - ctrl)) +
     geom_hline(yintercept = 0) +
     geom_segment(color = "red", linewidth = 0.8, arrow = arrow(type = "closed", length = unit(1, "mm"))) +
-    ggsignif::geom_signif(comparison = list(c("inside", "outside")), annotations = "**", textsize = font_size_small / .pt, y_position = 0.01) +
-    scale_y_continuous(limits = c(-0.1, 0.1), expand = expansion(mult = c(0.05, 0.05)), n.breaks = 3) +
+    ggsignif::geom_signif(comparison = list(c("inside", "outside")), 
+                          annotations = paste0("$p=7\\times10^{-5}$"),
+                          textsize = font_size_tiny / .pt, y_position = 0.01, vjust = -0.1) +
+    scale_y_continuous(limits = c(-0.1, 0.075), expand = expansion(add = 0), breaks = c(-0.1, 0)) +
     scale_x_discrete(labels = c("inside" = "Nbh.", "outside" = "other")) +
     labs(subtitle = "$ \\text{Diff. in diff.}$\n($\\Delta_{\\text{nbh}} - \\Delta_{\\text{other}}$)",
          y = "$\\Delta$") +
