@@ -68,7 +68,7 @@ suppl_int_mix_plt <- perf_data %>%
                          labels = c("$k$-NN Mix $\\uparrow$", "$\\log$ MMD $\\downarrow$", "Wasserstein $\\downarrow$",  "Var. explained by condition $\\downarrow$"))) %>%
   ggplot(aes(x = method, y = value)) +
     ggbeeswarm::geom_quasirandom(size = 0.4, width = 0.3) +
-    stat_summary(geom = "pointrange", fun.data = mean_se, color = "red", size = 1, fatten = 1) +
+    stat_summary(geom = "point", fun = mean, color = "red", size = 1.4) +
     ggh4x::facet_grid2(vars(comparison), vars(metric), scales = "free_y", independent = "y",
                        labeller = labeller(comparison = as_labeller(condition_labels)),
                        strip = ggh4x::strip_vanilla(clip = "off")) +
@@ -87,7 +87,7 @@ suppl_int_signal_plt1 <- perf_data %>%
                          labels = c( "ARI $\\uparrow$", "NMI $\\uparrow$", "Var. explained by cell type $\\uparrow$"))) %>%
   ggplot(aes(x = method, y = value)) +
     ggbeeswarm::geom_quasirandom(size = 0.4, width = 0.3) +
-    stat_summary(geom = "pointrange", fun.data = mean_se, color = "red", size = 1, fatten = 1) +
+    stat_summary(geom = "point", fun = mean, color = "red", size = 1.4) +
     ggh4x::facet_grid2(vars(comparison), vars(metric), scales = "free_y", independent = "y",
                        labeller = labeller(comparison = as_labeller(condition_labels)),
                        strip = ggh4x::strip_vanilla(clip = "off")) +
@@ -105,7 +105,7 @@ suppl_int_signal_plt2 <- perf_data %>%
                          labels = c("$k$-NN Overlap $\\uparrow$"))) %>%
   ggplot(aes(x = method, y = value)) +
     ggbeeswarm::geom_quasirandom(size = 0.4, width = 0.3) +
-    stat_summary(geom = "pointrange", fun.data = mean_se, color = "red", size = 1, fatten = 1) +
+    stat_summary(geom = "point", fun = mean, color = "red", size = 1.4) +
     ggh4x::facet_grid2(vars(comparison), vars(metric), scales = "free_y", independent = "y",
                        labeller = labeller(comparison = as_labeller(condition_labels)),
                        strip = ggh4x::strip_vanilla(clip = "off")) +
@@ -126,7 +126,7 @@ suppl_int_ss_plt <- perf_data %>%
   mutate(metric = "$\\downarrow$") %>%
   ggplot(aes(x = method, y = rel_SS)) +
     ggbeeswarm::geom_quasirandom(size = 0.4, width = 0.3) +
-    stat_summary(geom = "pointrange", fun.data = mean_se, color = "red", size = 1, fatten = 1) +
+    stat_summary(geom = "point", fun = mean, color = "red", size = 1.4) +
     ggh4x::facet_grid2(vars(comparison), vars(metric), scales = "free_y", independent = "y",
                        labeller = labeller(comparison = as_labeller(condition_labels)),
                        strip = ggh4x::strip_vanilla(clip = "off")) +
@@ -339,9 +339,9 @@ pl1 <- full_data_rel %>%
     # geom_point(data = . %>% filter(is.infinite(rel_perf)), size = 0.2) +  # filtering breaks the x-axis order thus hack alpha
     geom_point(aes(alpha = is.infinite(rel_perf) * 1.0), size = 0.2, show.legend = FALSE) +
     ggbeeswarm::geom_quasirandom(size = 0.2) +
-    geom_pointrange(data = full_data_rel %>% filter(metric %in% norm_metric) %>% 
-                      summarize(rel_perf = mean_se(rel_perf), .by = c(method, metric)),
-                    aes(y = rel_perf$y, ymin = rel_perf$ymin, ymax = rel_perf$ymax), color = "red", fatten = 1, size = 1) +
+    geom_point(data = full_data_rel %>% filter(metric %in% norm_metric) %>% 
+                      summarize(rel_perf = mean(rel_perf), .by = c(method, metric)),
+                    aes(y = rel_perf), color = "red", size = 1.4) +
     facet_grid(vars(is_perf), vars(metric), labeller = labeller(metric = as_labeller(pred_metrics_labels))) +
     scale_x_discrete(labels = pred_method_labels, breaks = pred_methods) +
     scale_y_continuous(breaks = c(0, 1, 2, 2.6), labels = c(0, 1, 2, "$>$2.5"), limits = c(0, 2.6), expand = expansion(add = 0)) +
@@ -361,9 +361,9 @@ pl2 <- full_data_rel %>%
     # geom_point(data = . %>% filter(is.infinite(rel_perf)), size = 0.2) +  # filtering breaks the x-axis order thus hack alpha
     geom_point(aes(alpha = is.infinite(rel_perf) * 1.0), size = 0.2, show.legend = FALSE) +
     ggbeeswarm::geom_quasirandom(size = 0.2) +
-    geom_pointrange(data = full_data_rel %>% filter(str_starts(metric, "r2")) %>%
-                      summarize(value = mean_se(value), .by = c(method, metric)),
-                    aes(y = value$y, ymin = value$ymin, ymax = value$ymax), color = "red", fatten = 1, size = 1) +
+    geom_point(data = full_data_rel %>% filter(str_starts(metric, "r2")) %>%
+                      summarize(value = mean(value), .by = c(method, metric)),
+                    aes(y = value), color = "red", size = 1.4) +
     facet_grid(vars(is_perf), vars(metric), scales = "free_y", labeller = labeller(metric = as_labeller(pred_metrics_labels))) +
     scale_x_discrete(labels = pred_method_labels) +
     scale_y_continuous(breaks = c(0.5, 0.75, 1), labels = c("$<$0.5", 0.75, 1), limits = c(0.5, 1), expand = expansion(add = 0)) +
@@ -378,8 +378,8 @@ pl3 <- full_data_rel %>%
   filter(metric == "mmd") %>%
   ggplot(aes(x = method, y = value)) +
     ggbeeswarm::geom_quasirandom(size = 0.2) +
-    geom_pointrange(data = full_data_rel %>% filter(metric == "mmd") %>% summarize(value = mean_se(value), .by = c(method, metric)),
-                    aes(y = value$y, ymin = value$ymin, ymax = value$ymax), color = "red", fatten = 1, size = 1) +
+    geom_point(data = full_data_rel %>% filter(metric == "mmd") %>% summarize(value = mean(value), .by = c(method, metric)),
+                    aes(y = value), color = "red", size = 1.4) +
     facet_grid(vars(is_perf), vars(metric), scales = "free_y", labeller = labeller(metric = as_labeller(pred_metrics_labels))) +
     scale_x_discrete(labels = pred_method_labels) +
     coord_cartesian(clip = "off") +
@@ -414,7 +414,7 @@ perf_pred_plot <- pred_data_long %>%
   ggplot(aes(x = rel_perf, y = method)) +
     geom_vline(xintercept = 1, linewidth = 0.3, color = "black") +
     ggbeeswarm::geom_quasirandom(color = "grey", width = 0.2, size = 0.5) +
-    stat_summary(geom = "pointrange", fun.data = mean_se, color = "red", size = 0.4) +
+    stat_summary(geom = "point", fun = mean, color = "red", size = 2) +
     small_arrow(position = c(0.1, 0.01), offset = 0.03) +
     facet_wrap(vars(metric), labeller = as_labeller(c("l2_mean_per_celltype" = "Prediction error for 13 datasets"))) +
     scale_x_continuous(expand = expansion(mult = c(0, 0.1)), breaks = c(0, 1, 2)) +
@@ -640,7 +640,7 @@ all_methods_power <- de_power_fdr_with_label %>%
   ggplot(aes(x = rel_TPR, y = method_label)) +
     geom_vline(xintercept = 1, linewidth = 0.3, color = "black") +
     ggbeeswarm::geom_quasirandom(color = "lightgrey", width = 0.2, size = 0.5) +
-    stat_summary(aes(color = controls_fdr), geom = "pointrange", fun = mean, size = 0.4) +
+    stat_summary(aes(color = controls_fdr), geom = "point", fun = mean, size = 2) +
     ggh4x::facet_grid2(rows = vars(method), scales = "free_y", space = "free_y") +
     scale_color_manual(values = c("TRUE" = "red", "FALSE" = "darkgrey")) +
     labs(color = "FDR control on average", y = "", x = "Relative TPR") +
