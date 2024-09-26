@@ -320,6 +320,11 @@ expr_comparison_pl <- comparison_data %>%
 expr_comparison_pl
 ```
 
+```{r}
+writexl::write_xlsx(list("Panel A-D" = unpack_2d(master_data), 
+                         "Panel E" = comparison_data),
+                    path = "../source_data/alzheimer_figure.xlsx")
+```
 
 
 ```{r}

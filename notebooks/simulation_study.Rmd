@@ -101,8 +101,10 @@ arc_dat <- bind_rows(
          r = 2.5, start = atan2(fit$base_point[1], fit$base_point[2]), end = atan2(ctrl_space[1], ctrl_space[2])))
 
 # Lets make some data
-pl1 <- tibble(celltype = celltype_assign, condition = cond_assign, 
-       Y = t(Y), Y_ctrl = t(Y_pred_ctrl), Y_trt = t(Y_pred_trt)) %>%
+sim_data <- tibble(celltype = celltype_assign, condition = cond_assign, 
+       Y = t(Y), Y_ctrl = t(Y_pred_ctrl), Y_trt = t(Y_pred_trt)) 
+
+pl1 <- sim_data %>%
   ggplot() +
     annotate_subspace(origin = rowMeans(Y), dir = fit$base_point, color = "#898989", lwd = 0.5, alpha = 0.3) +
     annotate_labels_along(origin = rowMeans(Y), dir = fit$base_point, labels = "$o$: base space", at = 3,
@@ -166,6 +168,11 @@ pl2 <- tibble(celltype = celltype_assign, condition = cond_assign,emb = fit$embe
           panel.spacing.x = unit(3, "mm"))
 
 pl2
+```
+
+```{r}
+writexl::write_xlsx(list("Simulated data" = unpack_2d(sim_data), "True Differential Expression" = true_de),
+                    path = "../source_data/simulated_data.xlsx")
 ```
 
 

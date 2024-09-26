@@ -255,6 +255,9 @@ make_dim_pl <- function(red_dim, color_by = NULL, axis_label = ""){
       small_axis(label = axis_label, arrow_length = if(axis_label != "") 10 else 5)
 }
 
+source_dat <- as_tibble(colData(fit_small)) %>%
+    mutate(umap = reducedDim(fit_small, "UMAP")) %>%
+    unpack_2d()
 
 
 umap_orig_ct_pl <- make_dim_pl("UMAP", color_by = cell_type, axis_label = "") +
@@ -485,7 +488,7 @@ comparison_plots <- as_tibble(colData(psce)) %>%
 comparison_plots
 ```
 ```{r}
-comparison_pl <- as_tibble(colData(psce)) %>%
+comparison_dat <- as_tibble(colData(psce)) %>%
   mutate(expr_inside = as_tibble(t(assay(psce, "inside")))) %>%
   unpack(starts_with("expr"), names_sep = "-") %>%
   pivot_longer(starts_with("expr"), names_sep = "[-_]", names_to = c(".value", "origin", "gid")) %>%
@@ -496,7 +499,9 @@ comparison_pl <- as_tibble(colData(psce)) %>%
     condition == "panobinostat" ~ "panob.",
   )) %>%
   mutate(gene = factor(gene, levels = pan_genes_order)) %>%
-  filter(gene == "HIST3H2A") %>%
+  filter(gene == "HIST3H2A")
+
+comparison_pl <- comparison_dat %>%
   ggplot(aes(x = condition_short, y = expr)) +
     geom_point(aes(group = condition, color = condition), position = position_dodge(width = 0.7), size = 0.6, show.legend = FALSE) +
     geom_line(aes(group = patient_id, x = condition_short, y = expr), color = "lightgrey", linewidth = 0.3) +
@@ -710,17 +715,16 @@ as_tibble(ego1) %>%
 ```{r}
 neg_log10_trans <- scales::trans_new("neg_log10", trans = \(x) -log10(x),  inv = \(x) 10^(-x), domain = c(1e-100, Inf))
 
-
-volcano_enrichment_pl <- as_tibble(glm_de_res) %>%
-  # mutate(up_genes = name %in% ego1@geneSets[["GO:0006325"]]) %>%
+volcano_enrichment_dat <- as_tibble(glm_de_res) %>%
   mutate(down_genes = name %in% ego1@geneSets[["GO:0002181"]]) %>%
   mutate(category = case_when(
-    # up_genes ~ "Chromatin Reorganization",
     down_genes ~ "Cytopl. Transl. (GO:0002181)",
     TRUE ~ "other"
   )) %>%
   arrange(desc(category)) %>%
-  mutate(lfc = ifelse(lfc < -2.7, -Inf, lfc)) %>%
+  mutate(lfc = ifelse(lfc < -2.7, -Inf, lfc))
+
+volcano_enrichment_pl <- volcano_enrichment_dat %>%
   ggplot(aes(x = lfc, y = pval)) +
     ggrastr::rasterize(geom_point(data = . %>% filter(category == "other"), color = "lightgrey", stroke = 0, size = 0.2), dpi = 300) +
     ggrastr::rasterize(geom_point(data = . %>% filter(category != "other"), aes(color = category), stroke = 0, size = 0.6), dpi = 300) +
@@ -788,7 +792,13 @@ volcano_legend <- my_get_legend({
 
 ```
 
-
+```{r, paged.print=FALSE}
+writexl::write_xlsx(list("Panel B" = source_dat, 
+                         "Panel C (UMAP)" = unpack_2d(de_plot_data2),
+                         "Panel C (pseudobulk)" = comparison_data2,
+                         "Panel D" = volcano_enrichment_dat),
+                    path = "../source_data/glioblastoma_results.xlsx")
+```
 
 ```{r}
 row1_umap_width <- 48

@@ -39,6 +39,17 @@ my_get_legend <- function(plot){
   comps[[1]]
 }
 
+unpack_2d <- function(.data, cols = where(\(x) length(dim(x)) == 2), ..., names_sep = "-", error_call = rlang::current_env()){
+  sel_cols <- colnames(select(.data, {{cols}}))
+  .data |>
+    mutate(across(all_of(sel_cols), \(x){
+      if(is.null(colnames(x))){
+        colnames(x) <- paste0("dim", seq_len(ncol(x)))
+      }
+      as_tibble(x)
+    })) |>
+    unpack(all_of(sel_cols), names_sep = names_sep, error_call = error_call)
+}
 
 small_axis <- function(label = NULL, fontsize = 7, arrow_length = 10, label_offset = 1, fix_coord = TRUE, remove_axes = TRUE,
                        arrow_spec = grid::arrow(ends = "both", type = "closed", angle = 20, length = unit(arrow_length / 7, units)),

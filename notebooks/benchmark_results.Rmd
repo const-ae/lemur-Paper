@@ -497,11 +497,16 @@ umap <- uwot::umap(as.matrix(t(lemur_fit$embedding)))
 ```{r}
 sel_gene <- 8
 
-de_simulated_pl <- as_tibble(colData(lemur_fit)) %>%
+de_simulated_dat <- as_tibble(colData(lemur_fit)) %>%
   mutate(umap) %>%
+  mutate(expr = assay(lemur_fit, "logcounts")[sel_gene,]) %>%
+  mutate(de_pred = assay(lemur_fit, "DE")[sel_gene,]) %>%
+  mutate(inside = colnames(lemur_fit) %in% nei$neighborhood[[sel_gene]]) %>%
   mutate(is_de = lemur_fit$rowData$is_de_cell[[sel_gene]]) %>%
   mutate(is_de = ifelse(is_de, "DE", "Not DE")) %>%
-  mutate(is_de = fct_rev(is_de)) %>%
+  mutate(is_de = fct_rev(is_de))
+
+de_simulated_pl <- de_simulated_dat %>%
   ggplot(aes(x = umap[,1], y = umap[,2])) +
     ggrastr::rasterize(geom_point(aes(color = is_de), size = 0.1, stroke = 0), dpi = 600) +
     small_axis(label = "UMAP", fontsize = font_size_small) +
@@ -511,10 +516,7 @@ de_simulated_pl <- as_tibble(colData(lemur_fit)) %>%
     guides(color = guide_legend(override.aes = list(size = 1))) +
     theme(legend.position = "top", strip.text = element_text(margin = margin(b = -3, unit = "mm")))
 
-de_expr_pl <- as_tibble(colData(lemur_fit)) %>%
-  mutate(umap) %>%
-  mutate(expr = assay(lemur_fit, "logcounts")[sel_gene,]) %>%
-  mutate(inside = colnames(lemur_fit) %in% nei$neighborhood[[sel_gene]]) %>%
+de_expr_pl <- de_simulated_dat %>%
   ggplot(aes(x = umap[,1], y = umap[,2])) +
     ggrastr::rasterize(geom_point(aes(color = expr), size = 0.1, stroke = 0), dpi = 600) +
     # scale_color_viridis_c() +
@@ -526,9 +528,7 @@ de_expr_pl <- as_tibble(colData(lemur_fit)) %>%
     theme(legend.position = "top", strip.text = element_text(margin = margin(b = -3, unit = "mm")),
           panel.spacing.y = unit(2, "mm"))
 
-de_pred_pl <- as_tibble(colData(lemur_fit)) %>%
-  mutate(umap) %>%
-  mutate(de_pred = assay(lemur_fit, "DE")[sel_gene,]) %>%
+de_pred_pl <- de_simulated_dat %>%
   ggplot(aes(x = umap[,1], y = umap[,2])) +
     ggrastr::rasterize(geom_point(aes(color = de_pred), size = 0.1, stroke = 0), dpi = 600) +
     # scale_colour_gradient2_rev(limits = c(-2.5, 2.5), oob = scales::oob_squish, breaks = c(-2, 0, 2), mid = "lightgrey") +
@@ -540,10 +540,7 @@ de_pred_pl <- as_tibble(colData(lemur_fit)) %>%
     guides(color = guide_colorbar(barheight = unit(1, "mm"))) +
     theme(legend.position = "top", strip.text = element_text(margin = margin(b = -3, unit = "mm")))
 
-de_nei_pl <- as_tibble(colData(lemur_fit)) %>%
-  mutate(umap) %>%
-  mutate(is_de = lemur_fit$rowData$is_de_cell[[sel_gene]]) %>%
-  mutate(inside = colnames(lemur_fit) %in% nei$neighborhood[[sel_gene]]) %>%
+de_nei_pl <- de_simulated_dat %>%
   ggplot(aes(x = umap[,1], y = umap[,2])) +
     ggrastr::rasterize(geom_point(aes(color = is_de), size = 0.1, stroke = 0), dpi = 600) +
     small_axis(label = "", fontsize = font_size_small, arrow_length = 5) +
@@ -821,6 +818,19 @@ plot_assemble(
 ```
 
 # Assemble
+
+
+
+```{r}
+writexl::write_xlsx(list("Panel A" = kang_vis, 
+                         "Panel B" = int_bio_df,
+                         "Panel C" = kang_pred,
+                         "Panel D" = pred_data_long,
+                         "Panel E,F" = unpack_2d(de_simulated_dat),
+                         "Panel G" = all_de_power_fdr),
+                    path = "../source_data/performance_validation.xlsx")
+```
+
 
 ```{r}
 plot_assemble(

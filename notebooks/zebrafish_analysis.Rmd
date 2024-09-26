@@ -31,9 +31,11 @@ Time course
 ```{r}
 timepoint_brackets <- santoku::chop_evenly(fit_subset$colData$timepoint, intervals = 5)
 
-time_course_pl <- as_tibble(colData(fit_subset)) %>%
+time_course_dat <- as_tibble(colData(fit_subset)) %>%
   mutate(timepoint_brackets = timepoint_brackets) %>%
-  mutate(umap = umaps$umap_all) %>%
+  mutate(umap = umaps$umap_all) 
+
+time_course_pl <- time_course_dat %>%
   ggplot(aes(x = umap[,1], y = umap[,2])) +
     ggrastr::rasterize(geom_point(data = tibble(umap = umaps$umap_all), size = 0.1, stroke = 0, color = "grey85"), dpi = 300) +
     ggrastr::rasterize(geom_point(size = 0.01, stroke = 0, color = "black", alpha = 0.3), dpi = 600) +
@@ -332,6 +334,17 @@ plot_assemble(
 )
 ```
 
+```{r, paged.print=FALSE}
+writexl::write_xlsx(list("Panel A" = time_course_dat %>% 
+                           dplyr::select(cell, timepoint, starts_with("cell_type"), tissue, germ_layer, group_cluster,
+                                         embryo, timepoint_brackets, umap) %>% 
+                           unpack_2d(), 
+                         "Panel B" = bind_rows(
+                           tibble(origin = "CNS", umap = umaps$umap_inter1[sel_pos,], position = seq(0, 1, l = n_pos)),
+                           tibble(origin = "periderm", umap = umaps$umap_inter2[sel_pos,], position = seq(0, 1, l = n_pos))) |> unpack_2d(),
+                         "Panel C" = bind_rows(pred_expr_df, pred_expr_df2)),
+                    path = "../source_data/zebrafish.xlsx")
+```
 
 ```{r}
 plot_assemble(
