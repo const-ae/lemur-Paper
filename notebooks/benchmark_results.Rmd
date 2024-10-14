@@ -259,7 +259,7 @@ kang_plot <- kang_vis %>%
           size = font_size_small / .pt, vjust = 1.5) +
     geom_text(data = kang_umap_annot_df, aes(x = label_xpos, y = Inf, label = ari_label, hjust = label_hjust), 
             size = font_size_small / .pt, vjust = 3) +
-    scale_color_manual(values = c("ctrl" = "#FC8D62", "stim" = "#8DA0CB")) +
+    scale_color_manual(values = c("ctrl" = "#FC8D62", "stim" = "#8DA0CB"), labels = c("ctrl" = "control", "stim" = "stimulated")) +
     facet_wrap(vars(method), nrow = 1, labeller = as_labeller(c("lemur" = "LEMUR", "CPA" = "CPA", "PCA" = "PCA", "harmony" = "Harmony", "scvi" = "scVI"))) +
     guides(color = guide_legend(override.aes = list(size = 2))) +
     small_axis(label = "UMAP", fontsize = font_size_small) +
@@ -678,8 +678,8 @@ fdr_power_dat <- all_de_power_fdr %>%
   mutate(data_vals = glue::glue("{data}\n{vals}")) %>%
   mutate(lemur_fdr = mean(FDR[method == "LEMUR"]), .by = c(data, vals)) %>%
   mutate(data = fct_reorder(as.factor(data), lemur_fdr, max),
-         vals = factor(vals, c("never", "heavy", "Control", "ctrl", "stim", "3m", "24m", "form", "0h", "1h", "4h"))
-         # vals = fct_reorder(as.factor(vals), lemur_fdr, max)
+         vals = factor(vals, c("never", "heavy", "Control", "ctrl", "stim", "3m", "24m", "form", "0h", "1h", "4h")),
+         vals = fct_recode(vals, control = "ctrl", stimulated = "stim", formalin = "form")
          ) 
 
 
