@@ -90,85 +90,6 @@ make_variance_explained_jobs <- function(dataset, variation = "small"){
                           dep_jobs = list(job), memory = mem)
 }
 
-make_perturbation_jobs <- function(datasets = c('norman', 'adamson', 'replogle_k562_essential', 'replogle_rpe1_essential'),
-                                   seeds = 1:5){
-  jobs <- lapply(datasets, \(dataset){
-    inner_jobs <- lapply(seeds, \(se){
-      config_job <- prepare_perturbation_data(list(dataset = dataset,  seed = se))
-      default_params <- list(dataset_name = dataset, test_train_config_id = config_job$result_id, seed = se)
-      pert_jobs <- list(
-        scgpt = scgpt_combinatorial_prediction(default_params, dep_jobs = list(config_job)),
-        scgpt_oneshot = scgpt_combinatorial_prediction(c(default_params, list(epochs = 0)), dep_jobs = list(config_job)),
-        gears = gears_combinatorial_prediction(default_params, dep_jobs = list(config_job)),
-        ground_truth = ground_truth_combinatorial_prediction(default_params, dep_jobs = list(config_job))
-      )
-      if(dataset == "norman"){
-        pert_jobs <- append(pert_jobs, list(
-          additive_model = additive_model_combinatorial_prediction(default_params, dep_jobs = list(config_job)),
-          pylemur = pylemur_combinatorial_prediction(default_params, dep_jobs = list(config_job))
-        ))
-      }else{
-        pert_jobs <- append(pert_jobs, list(
-          linear = linear_perturbation_prediction(c(default_params, list(ridge_penalty = 0.1, pca_dim = 5)), dep_jobs = list(config_job)),
-          linear_highRidge = linear_perturbation_prediction(c(default_params, list(ridge_penalty = 3, pca_dim = 5)), dep_jobs = list(config_job)),
-          pretrained_k562 = transfer_perturbation_prediction(c(default_params, list(ridge_penalty = 0.1, pca_dim = 5, reference_data = "replogle_k562_essential")),  dep_jobs = list(config_job)),
-          pretrained_k562_highDim = transfer_perturbation_prediction(c(default_params, list(ridge_penalty = 0.1, pca_dim = 40, reference_data = "replogle_k562_essential")),  dep_jobs = list(config_job)),
-          pretrained_rpe1 = transfer_perturbation_prediction(c(default_params, list(ridge_penalty = 0.1, pca_dim = 5, reference_data = "replogle_rpe1_essential")), dep_jobs = list(config_job)),
-          pretrained_rpe1_highDim = transfer_perturbation_prediction(c(default_params, list(ridge_penalty = 0.1, pca_dim = 40, reference_data = "replogle_rpe1_essential")), dep_jobs = list(config_job))
-        ))
-      }
-      pert_jobs
-    })
-    names(inner_jobs) <- seeds
-    purrr::list_flatten(inner_jobs, name_spec = "{outer}-{inner}")
-  })
-  names(jobs) <- datasets
-  jobs <- purrr::list_flatten(jobs, name_spec = "{outer}-{inner}")
-  
-  params <- list(
-    job_ids = map_chr(jobs, "result_id"),
-    names = names(jobs)
-  )
-  collect_perturbation_predictions(params, dep_jobs = jobs)
-}
-
-rmap <- function(.x, .f, ..., .progress = FALSE){
-  map(seq_len(nrow(.x)), \(idx){
-    .f(.x[idx,], ...)
-  }, .progress = .progress)
-}
-
-rmap2 <- function(.x, .y, .f, ..., .progress = FALSE){
-  map2(seq_len(nrow(.x)), .y, \(idx, ..y){
-    .f(.x[idx,], ..y, ...)
-  }, .progress = .progress)
-}
-
-make_perturbation_sweep <- function(datasets = c('adamson', 'replogle_rpe1_essential'),
-                                    ridge_penalty = 10^seq(-2, 1, length.out = 5),
-                                    pca_dim = c(2, 5, 10, 20, 50, 100, 200, 500),
-                                    seeds = 1:2){
-  config_jobs <- tidyr::expand_grid(datasets, seeds) %>%
-     mutate(config_job = rmap(across(c(dataset = datasets, seed=seeds)), prepare_perturbation_data))
-  ref_jobs <- config_jobs %>%
-    mutate(test_train_config_id = map_chr(config_job, "result_id")) %>%
-    mutate(ground_truth = rmap2(across(c(dataset_name = datasets, test_train_config_id, seed = seeds)), config_job,
-                          \(x, y) ground_truth_combinatorial_prediction(x, list(y))))
-
-  jobs <- tidyr::expand_grid(datasets, ridge_penalty, pca_dim, seeds) %>%
-    left_join(config_jobs, by = c("datasets", "seeds")) %>%
-    mutate(test_train_config_id = map_chr(config_job, "result_id")) %>%
-    mutate(linear = rmap2(across(c(dataset_name = datasets, test_train_config_id, ridge_penalty, pca_dim, seed = seeds)), config_job,
-                         \(x, y) linear_perturbation_prediction(x, list(y))),
-           pretrained = rmap2(cbind(reference_data = "replogle_k562_essential", across(c(dataset_name = datasets, test_train_config_id, ridge_penalty, pca_dim, seed = seeds))), config_job,
-                          \(x, y) transfer_perturbation_prediction(x, list(y)))) %>%
-    pivot_longer(c(linear, pretrained), names_to = "job_name", values_to = "job")
-
-  sweep <- collect_perturbation_predictions(list(job_ids = map_chr(jobs$job, "result_id"), names = jobs$job_name), dep_jobs = jobs$job)
-  ref <- collect_perturbation_predictions(list(job_ids = map_chr(ref_jobs$ground_truth, "result_id"), names = paste0("ground_truth-", ref_jobs$seeds, "-", ref_jobs$datasets)), dep_jobs = ref_jobs$ground_truth)
-  list(sweep = sweep, ref = ref)
-}
-
 
 variation <- "random_holdout_hvg"
 data_jobs <- map(datasets, \(dat) prepare_data(list(dataset = dat,  variation = variation), memory = "40GB"))
@@ -200,17 +121,6 @@ var_jobs %>%
   map_df(\(j) read_tsv(result_file_path(j), show_col_types = FALSE)) %>%
   write_tsv(glue::glue("output/variance_explained.tsv"))
 
-pert_jobs <- make_perturbation_jobs(seeds = 1:2)
-write_rds(pert_jobs, "tmp/combinatorial_perturbation_jobs.RDS")
-stat <- map_chr(pert_jobs$dependencies, job_status); table(stat)
-run_job(pert_jobs, priority = "normal")
-file.copy(file.path(result_file_path(pert_jobs), "predictions.RDS"), to = "output/perturbation_results_predictions.RDS")
-file.copy(file.path(result_file_path(pert_jobs), "parameters.RDS"), to = "output/perturbation_results_parameters.RDS")
-
-
-pert_sweep <- make_perturbation_sweep()
-walk(pert_sweep, run_job, "low")
-
 
 get_result_table <- function(jobs){
   job_df <- tibble(name = names(jobs), job = jobs) %>%
@@ -230,37 +140,6 @@ write_tsv(int_tab, glue::glue("output/integration_results-{variation}.tsv"))
 
 pred_tab <- get_result_table(pred_jobs)
 write_tsv(pred_tab, glue::glue("output/prediction_results-{variation}.tsv"))
-
-# -------------
-# Get parameter sweep output
-sweep <- bind_rows(readRDS(file.path(result_file_path(pert_sweep$sweep), "predictions.RDS"))) %>%
-  inner_join(readRDS(file.path(result_file_path(pert_sweep$sweep), "parameters.RDS")) %>%
-               map(\(p) tibble(id = p$id, name = p$name, parameters = as_tibble(p$parameters), 
-                               train = names(p$test_train_labels), perturbation = p$test_train_labels)) %>%
-               bind_rows() %>%
-               unnest(perturbation) %>%
-               unpack(parameters),
-             by = c("id", "perturbation", "name"))
-ref <- bind_rows(readRDS(file.path(result_file_path(pert_sweep$ref), "predictions.RDS"))) %>%
-  inner_join(readRDS(file.path(result_file_path(pert_sweep$ref), "parameters.RDS")) %>%
-               map(\(p) tibble(id = p$id, name = p$name, parameters = as_tibble(p$parameters), 
-                               train = names(p$test_train_labels), perturbation = p$test_train_labels)) %>%
-               bind_rows() %>%
-               unnest(perturbation) %>%
-               unpack(parameters),
-             by = c("id", "perturbation", "name")) %>%
-  dplyr::select(dataset_name, test_train_config_id, seed, perturbation, obs = prediction)
-
-sweep %>%
-  tidylog::inner_join(ref, by = c("dataset_name", "test_train_config_id", "seed", "perturbation")) %>%
-  tidylog::inner_join(ref %>% filter(perturbation == "ctrl") %>% dplyr::rename(baseline = obs) %>% dplyr::select(-perturbation),
-                      by = c("dataset_name", "test_train_config_id", "seed")) %>%
-  mutate(cor = map2_dbl(prediction, obs, cor),
-         dist = map2_dbl(prediction, obs, \(x, y) sqrt(sum((x - y)^2))),
-         delta_cor = pmap_dbl(list(prediction, obs, baseline), \(x, y, b) cor(x-b, y-b))) %>%
-  dplyr::select(name, dataset_name, ridge_penalty, pca_dim, seed, perturbation, training, cor, dist, delta_cor) %>%
-  write_tsv("output/perturbation_prediction_parameters_sweep.tsv.gz")
-
 
 
 
