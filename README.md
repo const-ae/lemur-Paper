@@ -1,6 +1,8 @@
 # Code to reproduce the figures from 'Analysis of multi-condition single-cell data with latent embedding multivariate regression'
 
-> Citation: Ahlmann-Eltze and Huber (2024), Analysis of multi-condition single-cell data with latent embedding multivariate regression.” bioRxiv. [doi:10.1101/2023.03.06.531268](http://dx.doi.org/10.1101/2023.03.06.531268)
+> Ahlmann-Eltze C, Huber W (2025).
+> “Analysis of multi-condition single-cell data with latent embedding multivariate regression.” Nature Genetics (2025).
+> [doi:10.1038/s41588-024-01996-0](https://doi.org/10.1038/s41588-024-01996-0).
 
 This repository contains the code to reproduce all figures from the manuscript. It is structured into 5 folders and several additional files which I will explain below.
 
