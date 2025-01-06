@@ -26,3 +26,5 @@ This repository contains the code to reproduce all figures from the manuscript. 
 
 The R package used in the analysis is available at https://bioconductor.org/packages/lemur/. The source code is at https://github.com/const-ae/lemur. 
 A Python implementation of the LEMUR model is available at https://github.com/const-ae/pylemur.
+
+For a simplified implementation of the LEMUR algorithm, see our blog post at [const-ae.name/post/2025-01-05_lemur_simplified/lemur-simplified/](https://const-ae.name/post/2025-01-05_lemur_simplified/lemur-simplified/).
